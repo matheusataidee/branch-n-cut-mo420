@@ -32,15 +32,33 @@ double objval_node1;
 /* Profundidade do nó */
 IloInt node_depth;
 
+enum ModelType {
+  ILP,
+  HYBRID
+};
+
 int main(int argc, char * argv[]) {
 
   /* variaveis auxiliares */
-  char opcoes[2]="";
-  char probname[] = "mochila";
   /* - diz se usara ou nao a heuristica primal */
-  bool HEURISTICA_PRIMAL;
-  /* - diz se usara ou nao cortes */
-  bool BRANCH_AND_CUT;
+  ModelType model_type;
+  double timelimit;
+  bool use_primal_heur;
+  string input_path;
+
+  if (argc < 5 || argc > 5) {
+    cout << "Usage: " << string(argv[0]) << " <model> <time-limit> <heur-primal> <arq-input>" << endl;
+    cout << "\t<model>: s for ILP, h for HYBRID" << endl;
+    cout << "\t<time-limit>: Time limit in seconds" << endl;
+    cout << "\t<heur-primal>: 1 for using, 0 for not using" << endl;
+    cout << "\t<arq-input>: path to input instance" << endl;
+    return -1;
+  } else {
+    model_type = (string(argv[1]) == "s") ? ILP : HYBRID;
+    timelimit = atof(argv[2]);
+    use_primal_heur = (string(argv[3]) == "1");
+    input_path = string(argv[4]);
+  }
 
   /* ambiente do cplex */
   IloEnv env;
@@ -73,15 +91,6 @@ int main(int argc, char * argv[]) {
   for(int i = 0; i < a_; i++){
     x["" + to_string(origem[i]) + "-" + to_string(destino[i]) + ""] = &x_temp[i];
   }
-
-/*
-  for(int i = 0; i < v_; i++){
-    cout << *y[i] << endl;
-  }
-
-  for(int i = 0; i < a_; i++){
-    cout << *x[to_string(a1[i]) + "-" + to_string(a2[i])] << endl;
-  } */
 
   /* funcao objetivo (1) */
   IloExpr obj(env);
