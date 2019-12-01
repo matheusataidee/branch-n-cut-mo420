@@ -188,6 +188,9 @@ int main(int argc, char * argv[]) {
 /*  informa se usara ou nao a heuristica primal */
 	bool use_primal_heur;
 
+/*  define o ambiente do cplex */
+	IloEnv env;
+
 	if(argc < 5 || argc > 5){
 		cout << "Usage: " << string(argv[0]) << " <model> <time-limit> <heur-primal> <arq-input>" << endl;
 		cout << "\t<model>: s for ILP, h for HYBRID" << endl;
@@ -201,6 +204,21 @@ int main(int argc, char * argv[]) {
 		use_primal_heur = (string(argv[3]) == "1");
 		input_path = string(argv[4]);
 	}
+
+/*  inicializa valores de variaveis globais de corte e separacao */
+	totcuts = 0;   
+	itersep = 0;
+
+	cout << "[Entrar com os dados da instancia: (copiar e colar todos os valores)]" << endl;
+
+/*  le dados de entrada do problema */
+	scanf("%d %d", &v_, &a_);
+	v.resize(v_);
+	origem.resize(a_);
+	destino.resize(a_);
+
+	for(int i = 0; i < v_; i++) scanf("%d", &v[i]);
+	for(int i = 0; i < a_; i++) scanf("%d %d", &origem[i], &destino[i]);
 
 /*  objeto que representa o modelo */
 	IloModel model(env);
