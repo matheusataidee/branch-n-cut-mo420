@@ -37,6 +37,37 @@ enum ModelType {
   HYBRID
 };
 
+ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
+
+/*	cout << "callback executado!" << endl; */
+
+/*  recupera o ambiente do cplex */
+	IloEnv env = getEnv();
+
+/*  pega a solução vigente */
+	IloNumArray val(env);
+	getValues(val, x);
+
+	IloNumArray y_val(env);
+	getValues(y_val, *y_global);
+
+/*	cria os cortes representados pelas desigualdades validas do tipo (18) */
+	for(int i = 0; i < v_; i++){
+		vector<int> arestas;
+		for(int e = 0; e < a_; e++)
+			if(val[e] == 1 && (i == origem[e] || i == destino[e])) arestas.push_back(e);
+
+		if(arestas.size() > 2 && y_val[i] < 1.0){
+			IloExpr cut(env);
+			for(int value : arestas) cut += x[value];
+			double lhs = double(arestas.size() - 2);
+			cout << cut << " - " << lhs << " * " << *y[i] << " <= " << 2 <<  endl; 
+			add(cut - lhs * *y[i] <= 2);
+		}
+	}
+
+}
+
 ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
 
 //	cout << "lazy constraint executado!" << endl;
