@@ -37,6 +37,107 @@ enum ModelType {
   HYBRID
 };
 
+ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
+
+//	cout << "lazy constraint executado!" << endl;
+
+/*  recupera o ambiente do cplex */
+	IloEnv env = getEnv();
+
+/*  pega a solução vigente */
+	IloNumArray val(env);
+	getValues(val, x);
+
+	IloNumArray y_val(env);
+	getValues(y_val, *y_global);
+
+	vector<vector<int>> components;
+	vector<int> inserted(v_, 0);
+	vector<int> inserted_(a_, 0);
+	int alocado = 0;
+	int novo;
+
+	vector<int> row;
+
+/*  avalia se o grafo retornado tem mais de uma componente e, se sim, separa essas componentes */
+	do{
+
+		if(row.size() == 0){
+
+/*			cout << "component novo criado" << endl; */
+
+			for(int k = 0; k < v_; k++){
+
+				if(inserted[k] == 0){
+					row.push_back(k);
+					inserted[k] = 1;
+					alocado++;
+					break;
+				}
+			}
+		}else{
+
+			novo = 1;
+
+			for(int k : row){
+				for(int e = 0; e < a_; e++){
+
+					if(k == origem[e] && val[e] == 1 && inserted[destino[e]] == 0){
+/*						cout << "["<< origem[e] << "," << destino[e] << "]" << endl; */
+						row.push_back(destino[e]);
+						inserted[destino[e]] = 1;
+						alocado++;
+						novo = 0;
+					}
+
+					if(k == destino[e] && val[e] == 1 && inserted[origem[e]] == 0){
+/*						cout << "[" << origem[e] << "," << destino[e] << "]" << endl; */
+						row.push_back(origem[e]);
+						inserted[origem[e]] = 1;
+						alocado++;
+						novo = 0;
+					}
+				}
+			}
+
+			if(novo){
+				components.push_back(row);
+				row.clear();
+			}
+		}
+
+	}while(alocado < 13);
+
+	components.push_back(row);
+
+/*  cria uma restrição tipo mochila (para cada componente) para suprimir subcilclos nas componentes encontradas */
+	for(const std::vector<int> &component : components){
+
+		if(component.size() < 13){
+
+/*			for(int value : component) std::cout << value << ' ';
+			std::cout << std::endl; */
+
+			IloExpr cut(env);
+			int arestas_na_solucao = 0;
+			for(int e = 0; e < a_; e++){
+
+				if(std::find(component.begin(), component.end(), origem[e]) != component.end() && std::find(component.begin(), component.end(), destino[e]) != component.end()){
+					cut += x[e];
+					if(val[e] == 1) arestas_na_solucao++;
+				}
+
+			}
+
+			double rhs = double(component.size() - 1.0);
+			if(arestas_na_solucao > rhs){
+				cout << cut << " <= " << rhs << endl;
+				add(cut <= rhs);
+			}
+		}
+	}
+}
+
 int main(int argc, char * argv[]) {
 
   /* variaveis auxiliares */
