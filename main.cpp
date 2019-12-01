@@ -9,28 +9,33 @@
 
 using namespace std;
 
-/* variaveis globais */
+int v_; /* armazena o número de vertices */
+int a_; /* armazena o número de arestas */
+vector<int> v; /* armazena nome dos vertices */
+vector<int> origem; /* armazena a origem das arestas */
+vector<int> destino; /* armazena o destino das arestas */
+map<int, IloBoolVar*> y; /* dicionario de ponteiros para as variaveis Y */
+map<std::string, IloBoolVar*> x; /* dicionario de ponteiros para as variaveis X */  
 
-/* dados da mochila */
-int v_;
-int a_;              /* número de itens */
-vector<int> v;   /* custos */
-vector<int> origem;
-vector<int> destino;
-vector<int> w;      /* pesos */
-int W;              /* capacidade */
-/* contador do total de cortes por nó da arvore B&B */
-int totcuts=0;
-/* contador do total de lacos de separacao de cortes por nó da arvore B&B */
-int itersep=0;
-/* profundidade maxima de um no da arvore de B&B em que sera feita separacao */
-int MAX_NODE_DEPTH_FOR_SEP=1000000;
-/* - valor otimo da primeira relaxacao */
-double objval_relax;
-/* - valor da relaxacao linear no final do 1o nó */
-double objval_node1;
-/* Profundidade do nó */
-IloInt node_depth;
+IloBoolVarArray* y_global;     
+IloBoolVarArray* x_global;     
+
+/* ---- conjunto de variaveis ainda nao utilizadas devidamente (estavam no exemplo) ---- */
+
+	/* contador do total de cortes por nó da arvore B&B */
+	int totcuts = 0;
+	/* contador do total de lacos de separacao de cortes por nó da arvore B&B */
+	int itersep = 0;
+	/* profundidade maxima de um no da arvore de B&B em que sera feita separacao */
+	int MAX_NODE_DEPTH_FOR_SEP = 1000000;
+	/* - valor otimo da primeira relaxacao */
+	double objval_relax;
+	/* - valor da relaxacao linear no final do 1o nó */
+	double objval_node1;
+	/* Profundidade do nó */
+	IloInt node_depth;
+
+/* ------------------------------------------------------------------------------------- */
 
 enum ModelType {
   ILP,
@@ -169,114 +174,112 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
 	}
 }
 
+ILOHEURISTICCALLBACK1(HeuristicaPrimal, IloBoolVarArray, x) {
+	cout << "heuristica primal executada!" << endl;
+}
+
 int main(int argc, char * argv[]) {
 
-  /* variaveis auxiliares */
-  /* - diz se usara ou nao a heuristica primal */
-  ModelType model_type;
-  double timelimit;
-  bool use_primal_heur;
-  string input_path;
+/*  variaveis auxiliares */
+	ModelType model_type;
+	double timelimit;
+	string input_path;
 
-  if (argc < 5 || argc > 5) {
-    cout << "Usage: " << string(argv[0]) << " <model> <time-limit> <heur-primal> <arq-input>" << endl;
-    cout << "\t<model>: s for ILP, h for HYBRID" << endl;
-    cout << "\t<time-limit>: Time limit in seconds" << endl;
-    cout << "\t<heur-primal>: 1 for using, 0 for not using" << endl;
-    cout << "\t<arq-input>: path to input instance" << endl;
-    return -1;
-  } else {
-    model_type = (string(argv[1]) == "s") ? ILP : HYBRID;
-    timelimit = atof(argv[2]);
-    use_primal_heur = (string(argv[3]) == "1");
-    input_path = string(argv[4]);
-  }
+/*  informa se usara ou nao a heuristica primal */
+	bool use_primal_heur;
 
-  /* ambiente do cplex */
-  IloEnv env;
+	if(argc < 5 || argc > 5){
+		cout << "Usage: " << string(argv[0]) << " <model> <time-limit> <heur-primal> <arq-input>" << endl;
+		cout << "\t<model>: s for ILP, h for HYBRID" << endl;
+		cout << "\t<time-limit>: Time limit in seconds" << endl;
+		cout << "\t<heur-primal>: 1 for using, 0 for not using" << endl;
+		cout << "\t<arq-input>: path to input instance" << endl;
+		return -1;
+	}else{
+		model_type = (string(argv[1]) == "s") ? ILP : HYBRID;
+		timelimit = atof(argv[2]);
+		use_primal_heur = (string(argv[3]) == "1");
+		input_path = string(argv[4]);
+	}
 
-  /* inicializa valores de variaveis globais */
-  totcuts=0;   itersep=0;
+/*  objeto que representa o modelo */
+	IloModel model(env);
 
-  cout << "[Entrar com os dados da instancia:]" << endl;
+	IloBoolVarArray y_temp(env, v_);
+	y_global = &y_temp;
+	for(int i = 0; i < v_; i++){
+		y[i] = &y_temp[i];
+	}
 
-  /* le dados de entrada do problema da Mochila 0-1.*/
-  scanf("%d %d",&v_,&a_);
-  v.resize(v_);
-  origem.resize(a_);
-  destino.resize(a_);
+	IloBoolVarArray x_temp(env, a_);
+	x_global = &x_temp;
+	for(int i = 0; i < a_; i++){
+		x["" + to_string(origem[i]) + "-" + to_string(destino[i]) + ""] = &x_temp[i];
+	}
 
-  for(int i=0;i<v_;i++) scanf("%d",&v[i]);
-  for(int i=0;i<a_;i++) scanf("%d %d",&origem[i],&destino[i]);
+/*  define a funcao objetivo (1) */
+	IloExpr obj(env);
+	for(int i = 0; i < v_; i++)
+		obj += *y[i];
+	model.add(IloMinimize(env, obj)); 
 
-  /* objeto que representa o modelo */
-  IloModel model(env);
+/*  cria restricao (3) */
+	IloExpr constr_3(env);
+	for(int i = 0; i < a_; i++)
+		constr_3 += *x[to_string(origem[i]) + "-" + to_string(destino[i])];
+	model.add(constr_3 == v_ - 1);
 
-  map<int, IloBoolVar*> y;
-  IloBoolVarArray y_temp(env, v_);
-  for(int i = 0; i < v_; i++){
-    y[i] = &y_temp[i];
-  }
+/*  cria familia de restricoes (4) */
+	for(int i = 0; i < v_; i++){
+		IloExpr constr_4(env);
+		for(int e = 0; e < a_; e++){
+			if(i == origem[e]) constr_4 += *x[to_string(i) + "-" + to_string(destino[e])];
+			if(i == destino[e]) constr_4 += *x[to_string(origem[e]) + "-" + to_string(i)];
+		}
+		model.add(constr_4 - 2 - 7 * *y[i] <= 0); /* ajustar o valor 100 para d(v) */
+	} 
 
-  map<std::string, IloBoolVar*> x;
-  IloBoolVarArray x_temp(env, a_);
-  for(int i = 0; i < a_; i++){
-    x["" + to_string(origem[i]) + "-" + to_string(destino[i]) + ""] = &x_temp[i];
-  }
+/*  cria objeto do cplex */
+	IloCplex cplex(env);
 
-  /* funcao objetivo (1) */
-  IloExpr obj(env);
-  for(int i = 0; i < v_; i++)
-    obj += *y[i];
-  model.add(IloMinimize(env, obj)); 
+/*  carrega o modelo */
+	cplex.extract(model);
 
-  /* restricao (3) */
-  IloExpr constr_3(env);
-  for(int i = 0; i < a_; i++)
-    constr_3 += *x[to_string(origem[i]) + "-" + to_string(destino[i])];
-  model.add(constr_3 == v_ - 1);
+/*  atribui valores aos diferentes parametros de controle do CPLEX */
+	cplex.setParam(IloCplex::Param::TimeLimit, MAX_CPU_TIME);
+	cplex.setParam(IloCplex::Param::Preprocessing::Presolve, CPX_OFF);
+	cplex.setParam(IloCplex::Param::MIP::Strategy::HeuristicFreq, -1);
+	cplex.setParam(IloCplex::Param::MIP::Strategy::RINSHeur, -1);
+	cplex.setParam(IloCplex::Param::MIP::Strategy::FPHeur, -1);
+	cplex.setParam(IloCplex::Param::Preprocessing::Linear, 0);
+	cplex.setParam(IloCplex::Param::MIP::Strategy::Search, CPX_MIPSEARCH_TRADITIONAL);
+	cplex.setParam(IloCplex::Param::Threads, 1);
+	cplex.setParam(IloCplex::Param::MIP::Limits::CutsFactor, 1.0);
 
-  /* restricao (4) */
-  for(int i = 0; i < v_; i++){
-    IloExpr constr_4(env);
-    for(int e = 0; e < a_; e++){
-      if(i == origem[e]) constr_4 += *x[to_string(i) + "-" + to_string(destino[e])];
-      if(i == destino[e]) constr_4 += *x[to_string(origem[e]) + "-" + to_string(i)];
-    }
-    model.add(constr_4 - 2 - 100 * *y[i] <= 0);
-  }
+/*  salva um arquivo ".lp" com o LP original */
+	cplex.exportModel("LP.lp");
 
-  /* cria objeto do cplex */
-  IloCplex cplex(env);
+	cplex.use(HeuristicaPrimal(env, x_temp));
+	cplex.use(LazyConstraints(env, x_temp));
+	cplex.use(Cortes(env, x_temp));
 
-  /* carrega o modelo */
-  cplex.extract(model);
+	cplex.solve();
 
-  /* salva um arquivo ".lp" com o LP original */
-  cplex.exportModel("LP.lp");
+	cout << endl << "solucao otima: " << cplex.getObjValue() << endl << endl;
 
-  cplex.solve();
+	IloNumArray ystar(env);
+	cplex.getValues(ystar, y_temp);
+	cout << "valores de y:" << endl;
+	for(int i = 0; i < v_; i++){
+		cout << "\ty[" << i << "]: " << ystar[i] << endl;
+	}
 
-  cout << "solucao otima: " << cplex.getObjValue() << endl;
+	IloNumArray xstar(env);
+	cplex.getValues(xstar, x_temp);
+	cout << endl << "valores de x:" << endl;
+	for(int i = 0; i < a_; i++){
+		cout << "\tx[" << origem[i] << "," << destino[i] << "]: " << xstar[i] << endl;
+	}
 
-  IloNumArray ystar(env);
-  cplex.getValues(ystar, y_temp);
-  cout << "valores de y:" << endl;
-  for(int i = 0; i < v_; i++){
-    cout << "y[" << i << "]: " << ystar[i] << endl;
-  }
-
-  IloNumArray xstar(env);
-  cplex.getValues(xstar, x_temp);
-  cout << "valores de x:" << endl;
-  for(int i = 0; i < a_; i++){
-    cout << "x[" << origem[i] << "," << destino[i] << "]: " << xstar[i] << endl;
-  }
-
-  /* cria variaveis do modelo */
-/*  IloBoolVarArray y(env, v_); */
-
-/*  IloBoolVar x(env);  */
-
-  return 0;
+	return 0;
 }
