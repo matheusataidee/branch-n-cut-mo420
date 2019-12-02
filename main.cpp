@@ -364,7 +364,7 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
 }
 
 ILOHEURISTICCALLBACK1(HeuristicaPrimal, IloBoolVarArray, x) {
-//	cout << "heuristica primal executada!" << endl;
+	cout << "heuristica primal executada!" << endl;
 }
 
 int main(int argc, char * argv[]) {
@@ -394,6 +394,8 @@ int main(int argc, char * argv[]) {
 		input_path = string(argv[4]);
 	}
 
+	cout << input_path << endl;
+
 /*  inicializa valores de variaveis globais de corte e separacao */
 	totcuts = 0;   
 	itersep = 0;
@@ -402,9 +404,11 @@ int main(int argc, char * argv[]) {
 
 	ifstream file(input_path);
 
+	int descarta;
+
 /*  le dados de entrada do problema */
 //	scanf("%d %d", &v_, &a_);
-	file >> v_ >> a_;
+	file >> v_ >> a_ >> descarta;
 	v.resize(v_);
 	origem.resize(a_);
 	destino.resize(a_);
@@ -420,7 +424,7 @@ int main(int argc, char * argv[]) {
 	int orig, dest;
 	for(int i = 0; i < a_; i++){
 //		scanf("%d %d", &orig, &dest);
-		file >> orig >> dest;
+		file >> orig >> dest >> descarta;
 
 		origem[i] = orig - 1;
 		destino[i] = dest - 1;
@@ -429,12 +433,13 @@ int main(int argc, char * argv[]) {
 		listaAdj[dest - 1].push_back(orig - 1);
 	}
 
-	cout << "leitura dos dados" << endl;
-
     pre_processamento();
+	cout << "pre processamento" << endl;
 
-	for(int value : arestas_ponte) cout << "aresta ponte: " << value + 14 << endl;
-	for(int value : vertices_corte) cout << "vertices corte: " << value << endl;
+//	for(int value : arestas_ponte) cout << "aresta ponte: " << value + 14 << " - (" << origem[value] << ", " << destino[value] << ")" << endl;
+//	for(int value : vertices_corte) cout << "vertices corte: " << value << endl;
+
+	if(model_type) return -1;
 
 /*  objeto que representa o modelo */
 	IloModel model(env);
@@ -481,6 +486,9 @@ int main(int argc, char * argv[]) {
 /*  carrega o modelo */
 	cplex.extract(model);
 
+/*  silencia o cplex no terminal */
+	cplex.setOut(env.getNullStream());
+
 /*  atribui valores aos diferentes parametros de controle do CPLEX */
 	cplex.setParam(IloCplex::Param::TimeLimit, MAX_CPU_TIME);
 	cplex.setParam(IloCplex::Param::Preprocessing::Presolve, CPX_OFF);
@@ -495,27 +503,27 @@ int main(int argc, char * argv[]) {
 /*  salva um arquivo ".lp" com o LP original */
 	cplex.exportModel("LP.lp");
 
-	cplex.use(HeuristicaPrimal(env, x_temp));
+	if(use_primal_heur == 1) cplex.use(HeuristicaPrimal(env, x_temp));
 	cplex.use(LazyConstraints(env, x_temp));
 	cplex.use(Cortes(env, x_temp));
 
 	cplex.solve();
 
-	cout << endl << "solucao otima: " << cplex.getObjValue() << endl << endl;
+	cout << "solucao otima: " << cplex.getObjValue() << endl << endl;
 
 	IloNumArray ystar(env);
 	cplex.getValues(ystar, y_temp);
-	cout << "valores de y:" << endl;
+/*	cout << "valores de y:" << endl;
 	for(int i = 0; i < v_; i++){
 		if(ystar[i] > 0) cout << "\ty[" << i << "]: " << ystar[i] << endl;
-	}
+	} */
 
 	IloNumArray xstar(env);
 	cplex.getValues(xstar, x_temp);
-	cout << endl << "valores de x:" << endl;
+/*	cout << endl << "valores de x:" << endl;
 	for(int i = 0; i < a_; i++){
 		if(xstar[i] > 0) cout << "\tx[" << origem[i] << "," << destino[i] << "]: " << xstar[i] << endl;
-	}
+	} */
 
 	return 0;
 }
