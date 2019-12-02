@@ -54,6 +54,21 @@ enum ModelType {
   HYBRID
 };
 
+void imprime_solucao(ModelType model_type, int timelimit, int use_primal_heur, string input_path, IloNumArray xstar){
+
+	ofstream file(input_path + ".sol");
+
+//	file.precision(6);	
+//	file.setf(ios::fixed);
+
+	if(!model_type) file << "s " << timelimit << " " << use_primal_heur << " " << input_path << endl;
+
+	for(int value = 0; value < a_; value++) 
+		if(xstar[value] == 1) file << origem[value] << " " << destino[value] << endl;
+
+	file.close();
+}
+
 void dfs_cortes(int v, int pai = -1){
 
 	visitado[v] = true;
@@ -117,7 +132,6 @@ ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 	int size_comp = 1;
 
 	vector<int> row;
-//	vector<int> vertices_corte {0, 10, 11}; // corrigir e colocar no global -----------------------------------------
 
 /*  recupera o ambiente do cplex */
 	IloEnv env = getEnv();
@@ -193,7 +207,7 @@ ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 			}
 		}
 
-	}while(alocado < 13);
+	}while(alocado < v_);
 
 	components.push_back(row);
 
@@ -331,14 +345,14 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
 			}
 		}
 
-	}while(alocado < 13);
+	}while(alocado < v_);
 
 	components.push_back(row);
 
 /*  cria uma restrição tipo mochila (para cada componente) para suprimir subcilclos nas componentes encontradas */
 	for(const std::vector<int> &component : components){
 
-		if(component.size() < 13){
+		if(component.size() < v_){
 
 /*			for(int value : component) std::cout << value << ' ';
 			std::cout << std::endl; */
@@ -433,6 +447,8 @@ int main(int argc, char * argv[]) {
 		listaAdj[dest - 1].push_back(orig - 1);
 	}
 
+	file.close();
+
     pre_processamento();
 	cout << "pre processamento" << endl;
 
@@ -524,6 +540,8 @@ int main(int argc, char * argv[]) {
 	for(int i = 0; i < a_; i++){
 		if(xstar[i] > 0) cout << "\tx[" << origem[i] << "," << destino[i] << "]: " << xstar[i] << endl;
 	} */
+
+	imprime_solucao(model_type, timelimit, use_primal_heur, input_path, xstar);
 
 	return 0;
 }
