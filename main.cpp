@@ -17,6 +17,7 @@ vector<int> destino; /* armazena o destino das arestas */
 map<int, IloBoolVar*> y; /* dicionario de ponteiros para as variaveis Y */
 map<std::string, IloBoolVar*> x; /* dicionario de ponteiros para as variaveis X */  
 vector<int> arestas_ponte; /* armazena as pontes encontradas no pre processamento */
+vector<int> vertices_corte;
 
 /* declaracao das necessidades do pre processamento */
 vector<vector<int>> listaAdj;
@@ -76,12 +77,14 @@ void dfs_cortes(int v, int pai = -1){
 //				cout << "Ponte (" << v << ", " << dest << ")" << endl;
 				for(int e = 0; e < a_; e++)
 					if(origem[e] == v && destino[e] == dest) arestas_ponte.push_back(e);
-                cout << "Vértice de corte: " << v << endl;
+				if(!(std::find(vertices_corte.begin(), vertices_corte.end(), v) != vertices_corte.end())) vertices_corte.push_back(v);
+//              cout << "Vértice de corte: " << v << endl;
 
 			/* Se dest alcançar v, a aresta (v, dest) não é uma ponte mas v é um vértice de corte. */
 			}else if(menor_retorno[dest] == tempo_entrada[v]){
 
-                cout << "Vértice de corte: " << v << endl;
+//              cout << "Vértice de corte: " << v << endl;
+				if(!(std::find(vertices_corte.begin(), vertices_corte.end(), v) != vertices_corte.end())) vertices_corte.push_back(v);
 
 			}
 		}
@@ -114,7 +117,7 @@ ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 	int size_comp = 1;
 
 	vector<int> row;
-	vector<int> vertices_corte {0, 10, 11}; // corrigir e colocar no global -----------------------------------------
+//	vector<int> vertices_corte {0, 10, 11}; // corrigir e colocar no global -----------------------------------------
 
 /*  recupera o ambiente do cplex */
 	IloEnv env = getEnv();
@@ -194,40 +197,62 @@ ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 
 	components.push_back(row);
 
+/*	avaliar em qual componente o vertice do corte esta e se ele esta em posicao de separacao [preparacao para (19)] */
 	if(size_comp == 2){
+		int position = -1;
 		for(const std::vector<int> &component : components){
+			position++;
 			if(component.size() > 2){
 				for(int cut_vertex : vertices_corte){
-					if(std::find(component.begin(), component.end(), cut_vertex) != component.end()){
-						for(int v1 = 0; v1 < component.size() - 1; v1++){
-							for(int v2 = v1 + 1; v2 < component.size(); v2++){
+					if(std::find(component.begin(), component.end(), cut_vertex) != component.end() && y_val[cut_vertex] < 1){
 
-								int encontrado = 0;
-								IloExpr cut(env);
+						int index;
+						if(position == 0)
+							index = 1;
+						else if (position == 1)
+							index = 0;
 
-								for(int e = 0; e < a_; e++){
-									if(origem[e] == cut_vertex && destino[e] == component[v1]){ 
-										cut += x[e];
-										encontrado++;
+						int separado = 0;
+						for(int e = 0; e < a_; e++){
+							if(origem[e] == cut_vertex){
+								if(std::find(components[index].begin(), components[index].end(), destino[e]) != components[index].end()) separado = 1;
+							}else if(destino[e] == cut_vertex){
+								if(std::find(components[index].begin(), components[index].end(), origem[e]) != components[index].end()) separado = 1;
+							}
+						}
+
+						if(separado){
+							for(int v1 = 0; v1 < component.size() - 1; v1++){
+								for(int v2 = v1 + 1; v2 < component.size(); v2++){
+
+									int encontrado = 0;
+									IloExpr cut(env);
+
+									for(int e = 0; e < a_; e++){
+										if(origem[e] == cut_vertex && destino[e] == component[v1]){ 
+											cut += x[e];
+											encontrado++;
+										}
+										if(destino[e] == cut_vertex && origem[e] == component[v1]){
+											cut += x[e];
+											encontrado++;
+										}
+										if(origem[e] == cut_vertex && destino[e] == component[v2]){
+											cut += x[e];
+											encontrado++;
+										}
+										if(destino[e] == cut_vertex && origem[e] == component[v2]){
+											cut += x[e];
+											encontrado++;
+										}
 									}
-									if(destino[e] == cut_vertex && origem[e] == component[v1]){
-										cut += x[e];
-										encontrado++;
-									}
-									if(origem[e] == cut_vertex && destino[e] == component[v2]){
-										cut += x[e];
-										encontrado++;
-									}
-									if(destino[e] == cut_vertex && origem[e] == component[v2]){
-										cut += x[e];
-										encontrado++;
+/*								cria os cortes representados pelas desigualdades validas do tipo (19) */
+								if(encontrado == 2 && y_val[cut_vertex] < 1){
+										add(cut - *y[cut_vertex] - 1 <= 0);
+//										for(int z : component) cout << z << " ";
+//										cout << endl << "vertices: " << cut_vertex << ", (" << component[v1] << ", " << component[v2] << ")" << endl;
 									}
 								}
-
-/*								if(encontrado == 2 && y_val[cut_vertex] < 1){
-									add(cut - *y[cut_vertex] - 1 <= 0);
-									cout << "vertices: " << cut_vertex << ", (" << component[v1] << ", " << component[v2] << ")" << endl;
-								} */ // voltar com essa parte quando tivermos a informacao completa dos vertices separados pelo corte ------------------
 							}
 						}
 					}
@@ -401,6 +426,7 @@ int main(int argc, char * argv[]) {
     pre_processamento();
 
 	for(int value : arestas_ponte) cout << "aresta ponte: " << value + 14 << endl;
+	for(int value : vertices_corte) cout << "vertices corte: " << value << endl;
 
 /*  objeto que representa o modelo */
 	IloModel model(env);
