@@ -300,6 +300,17 @@ int main(int argc, char * argv[]) {
   /* carrega o modelo */
   cplex.extract(model);
 
+  /*  atribui valores aos diferentes parametros de controle do CPLEX */
+	cplex.setParam(IloCplex::Param::TimeLimit, timelimit);
+	cplex.setParam(IloCplex::Param::Preprocessing::Presolve, CPX_OFF);
+	cplex.setParam(IloCplex::Param::MIP::Strategy::HeuristicFreq, -1);
+	cplex.setParam(IloCplex::Param::MIP::Strategy::RINSHeur, -1);
+	cplex.setParam(IloCplex::Param::MIP::Strategy::FPHeur, -1);
+	cplex.setParam(IloCplex::Param::Preprocessing::Linear, 0);
+	cplex.setParam(IloCplex::Param::MIP::Strategy::Search, CPX_MIPSEARCH_TRADITIONAL);
+	cplex.setParam(IloCplex::Param::Threads, 1);
+	cplex.setParam(IloCplex::Param::MIP::Limits::CutsFactor, 1.0);
+  
   /* salva um arquivo ".lp" com o LP original */
   cplex.exportModel("LP.lp");
 
