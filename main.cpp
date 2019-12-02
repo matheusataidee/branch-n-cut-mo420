@@ -398,10 +398,13 @@ int main(int argc, char * argv[]) {
 	totcuts = 0;   
 	itersep = 0;
 
-	cout << "[Entrar com os dados da instancia: (copiar e colar todos os valores)]" << endl;
+//	cout << "[Entrar com os dados da instancia: (copiar e colar todos os valores)]" << endl;
+
+	ifstream file(input_path);
 
 /*  le dados de entrada do problema */
-	scanf("%d %d", &v_, &a_);
+//	scanf("%d %d", &v_, &a_);
+	file >> v_ >> a_;
 	v.resize(v_);
 	origem.resize(a_);
 	destino.resize(a_);
@@ -409,19 +412,24 @@ int main(int argc, char * argv[]) {
 
 //	iota(v.begin(), v.end(), 0);
 
-	for(int i = 0; i < v_; i++) scanf("%d", &v[i]);
+//	for(int i = 0; i < v_; i++) scanf("%d", &v[i]);
+	for(int i = 0; i < v_; i++) v[i] = i;
+
 //	for(int i = 0; i < a_; i++) scanf("%d %d", &origem[i], &destino[i]);
 
 	int orig, dest;
 	for(int i = 0; i < a_; i++){
-		scanf("%d %d", &orig, &dest);
+//		scanf("%d %d", &orig, &dest);
+		file >> orig >> dest;
 
-		origem[i] = orig;
-		destino[i] = dest;
+		origem[i] = orig - 1;
+		destino[i] = dest - 1;
 
-		listaAdj[orig].push_back(dest);
-		listaAdj[dest].push_back(orig);
+		listaAdj[orig - 1].push_back(dest - 1);
+		listaAdj[dest - 1].push_back(orig - 1);
 	}
+
+	cout << "leitura dos dados" << endl;
 
     pre_processamento();
 
@@ -499,14 +507,14 @@ int main(int argc, char * argv[]) {
 	cplex.getValues(ystar, y_temp);
 	cout << "valores de y:" << endl;
 	for(int i = 0; i < v_; i++){
-		cout << "\ty[" << i << "]: " << ystar[i] << endl;
+		if(ystar[i] > 0) cout << "\ty[" << i << "]: " << ystar[i] << endl;
 	}
 
 	IloNumArray xstar(env);
 	cplex.getValues(xstar, x_temp);
 	cout << endl << "valores de x:" << endl;
 	for(int i = 0; i < a_; i++){
-		cout << "\tx[" << origem[i] << "," << destino[i] << "]: " << xstar[i] << endl;
+		if(xstar[i] > 0) cout << "\tx[" << origem[i] << "," << destino[i] << "]: " << xstar[i] << endl;
 	}
 
 	return 0;
