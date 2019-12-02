@@ -4,6 +4,7 @@
 
 #include <map>
 #include <string>
+#include <chrono>
 
 #include "ilcplex/ilocplex.h"
 
@@ -17,7 +18,7 @@ vector<int> destino; /* armazena o destino das arestas */
 map<int, IloBoolVar*> y; /* dicionario de ponteiros para as variaveis Y */
 map<std::string, IloBoolVar*> x; /* dicionario de ponteiros para as variaveis X */  
 vector<int> arestas_ponte; /* armazena as pontes encontradas no pre processamento */
-vector<int> vertices_corte;
+vector<int> vertices_corte; /* armazena os vertices de corte encontrados no pre processamento */
 
 /* declaracao das necessidades do pre processamento */
 vector<vector<int>> listaAdj;
@@ -34,18 +35,24 @@ IloBoolVarArray* x_global;
 
 /* ---- conjunto de variaveis ainda nao utilizadas devidamente (estavam no exemplo) ---- */
 
-	/* contador do total de cortes por nó da arvore B&B */
-	int totcuts = 0;
-	/* contador do total de lacos de separacao de cortes por nó da arvore B&B */
-	int itersep = 0;
-	/* profundidade maxima de um no da arvore de B&B em que sera feita separacao */
-	int MAX_NODE_DEPTH_FOR_SEP = 1000000;
-	/* - valor otimo da primeira relaxacao */
-	double objval_relax;
-	/* - valor da relaxacao linear no final do 1o nó */
-	double objval_node1;
-	/* Profundidade do nó */
-	IloInt node_depth;
+	
+	int totcuts = 0; /* contador do total de cortes por nó da arvore B&B */
+	int itersep = 0; /* contador do total de lacos de separacao de cortes por nó da arvore B&B */
+	int MAX_NODE_DEPTH_FOR_SEP = 1000000; /* profundidade maxima de um no da arvore de B&B em que sera feita separacao */
+	double objval_relax; /* valor otimo da primeira relaxacao */
+	double objval_node1; /* valor da relaxacao linear no final do 1o nó */
+
+	double zstar; /* melhor limitante primal encontrado */
+	double melhor_limitante_dual; /* melhor limitante dual encontrado */
+	int incumbent_node = -1; /* no do melhor limitante primal encontrado */
+
+	int contador_sec = 0;
+	int contador_d18 = 0;
+	int contador_d19 = 0;
+	int contador_d34 = 0;
+	int total_no_exp = 0;
+
+	IloInt node_depth; /* profundidade do nó */
 
 /* ------------------------------------------------------------------------------------- */
 
@@ -54,17 +61,42 @@ enum ModelType {
   HYBRID
 };
 
-void imprime_solucao(ModelType model_type, int timelimit, int use_primal_heur, string input_path, IloNumArray xstar){
+void imprime_solucao(ModelType model_type, int timelimit, int use_primal_heur, string input_path, IloNumArray xstar, double diff_time){
 
-	ofstream file(input_path + ".sol");
+/*	escrita do arquivo .sol */
+	ofstream file_sol(input_path + ".sol");
 
-//	file.precision(6);	
-//	file.setf(ios::fixed);
-
-	if(!model_type) file << "s " << timelimit << " " << use_primal_heur << " " << input_path << endl;
+	if(!model_type) file_sol << "s " << timelimit << " " << use_primal_heur << " " << input_path << endl;
 
 	for(int value = 0; value < a_; value++) 
-		if(xstar[value] == 1) file << origem[value] << " " << destino[value] << endl;
+		if(xstar[value] == 1) file_sol << origem[value] << " " << destino[value] << endl;
+
+	file_sol.close();
+
+/*	escrita do arquivo .est */
+	ofstream file(input_path + ".exp");
+
+	if(!model_type) file << "s " << timelimit << " " << use_primal_heur << " " << input_path << endl;
+	file << contador_sec << endl; /* int */
+	file << contador_d18 << endl; /* int */
+	file << contador_d19 << endl; /* int */
+	file << contador_d34 << endl; /* int */
+
+	file.precision(6);	
+	file.setf(ios::fixed);
+	file << objval_relax << endl; /* double */
+	file << objval_node1 << endl; /* double */
+
+	file.precision(0);	
+	file.setf(ios::fixed);
+	file << total_no_exp << endl; /* int */
+	file << incumbent_node << endl; /* int */
+	file << zstar << endl; /* int */
+
+	file.precision(6);	
+	file.setf(ios::fixed);
+	file << melhor_limitante_dual << endl; /* double */
+	file << diff_time << endl; /* double */
 
 	file.close();
 }
@@ -155,6 +187,7 @@ ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 			double lhs = double(arestas.size() - 2);
 //			cout << cut << " - " << lhs << " * " << *y[i] << " <= " << 2 <<  endl; 
 			add(cut - lhs * *y[i] <= 2);
+			contador_d18++;
 		}
 	}
 /*  fim do corte pelas desigualdades (18) */
@@ -263,6 +296,7 @@ ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 /*								cria os cortes representados pelas desigualdades validas do tipo (19) */
 								if(encontrado == 2 && y_val[cut_vertex] < 1){
 										add(cut - *y[cut_vertex] - 1 <= 0);
+										contador_d19++;
 //										for(int z : component) cout << z << " ";
 //										cout << endl << "vertices: " << cut_vertex << ", (" << component[v1] << ", " << component[v2] << ")" << endl;
 									}
@@ -372,6 +406,7 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
 			if(arestas_na_solucao > rhs){
 //				cout << cut << " <= " << rhs << endl;
 				add(cut <= rhs);
+				contador_sec++;
 			}
 		}
 	}
@@ -382,6 +417,8 @@ ILOHEURISTICCALLBACK1(HeuristicaPrimal, IloBoolVarArray, x) {
 }
 
 int main(int argc, char * argv[]) {
+
+	chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
 
 /*  variaveis auxiliares */
 	ModelType model_type;
@@ -506,7 +543,7 @@ int main(int argc, char * argv[]) {
 	cplex.setOut(env.getNullStream());
 
 /*  atribui valores aos diferentes parametros de controle do CPLEX */
-	cplex.setParam(IloCplex::Param::TimeLimit, MAX_CPU_TIME);
+	cplex.setParam(IloCplex::Param::TimeLimit, timelimit);
 	cplex.setParam(IloCplex::Param::Preprocessing::Presolve, CPX_OFF);
 	cplex.setParam(IloCplex::Param::MIP::Strategy::HeuristicFreq, -1);
 	cplex.setParam(IloCplex::Param::MIP::Strategy::RINSHeur, -1);
@@ -525,7 +562,12 @@ int main(int argc, char * argv[]) {
 
 	cplex.solve();
 
-	cout << "solucao otima: " << cplex.getObjValue() << endl << endl;
+	incumbent_node = cplex.getIncumbentNode();
+	zstar = cplex.getObjValue();
+	melhor_limitante_dual = cplex.getBestObjValue();
+	total_no_exp = cplex.getNnodes();
+
+	cout << "solucao otima: " << zstar << endl << endl;
 
 	IloNumArray ystar(env);
 	cplex.getValues(ystar, y_temp);
@@ -541,7 +583,10 @@ int main(int argc, char * argv[]) {
 		if(xstar[i] > 0) cout << "\tx[" << origem[i] << "," << destino[i] << "]: " << xstar[i] << endl;
 	} */
 
-	imprime_solucao(model_type, timelimit, use_primal_heur, input_path, xstar);
+	chrono::high_resolution_clock::time_point now = chrono::high_resolution_clock::now();
+	chrono::duration<double> diff_time = chrono::duration_cast<chrono::duration<double>>(now - start);
+
+	imprime_solucao(model_type, timelimit, use_primal_heur, input_path, xstar, diff_time.count());
 
 	return 0;
 }
