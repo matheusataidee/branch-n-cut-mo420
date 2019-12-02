@@ -74,7 +74,7 @@ void imprime_solucao(ModelType model_type, int timelimit, int use_primal_heur, s
 	file_sol.close();
 
 /*	escrita do arquivo .est */
-	ofstream file(input_path + ".exp");
+	ofstream file(input_path + ".est");
 
 	if(!model_type) file << "s " << timelimit << " " << use_primal_heur << " " << input_path << endl;
 	file << contador_sec << endl; /* int */
