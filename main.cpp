@@ -16,6 +16,17 @@ vector<int> origem; /* armazena a origem das arestas */
 vector<int> destino; /* armazena o destino das arestas */
 map<int, IloBoolVar*> y; /* dicionario de ponteiros para as variaveis Y */
 map<std::string, IloBoolVar*> x; /* dicionario de ponteiros para as variaveis X */  
+vector<int> arestas_ponte; /* armazena as pontes encontradas no pre processamento */
+
+/* declaracao das necessidades do pre processamento */
+vector<vector<int>> listaAdj;
+int tempo_global;
+vector<bool> visitado;
+vector<int> tempo_entrada; /* Tempo que a árvore DFS chega em v */
+vector<int> menor_retorno; /* Menor tempo de entrada que v alcança na árvore DFS */
+
+// void pre_processamento();
+// void dfs_cortes(int v, int pai = -1);
 
 IloBoolVarArray* y_global;     
 IloBoolVarArray* x_global;     
@@ -42,9 +53,68 @@ enum ModelType {
   HYBRID
 };
 
+void dfs_cortes(int v, int pai = -1){
+
+	visitado[v] = true;
+	tempo_entrada[v] = tempo_global;
+	menor_retorno[v] = tempo_global;
+	tempo_global++;
+
+	for(int dest : listaAdj[v]){
+
+		if(dest == pai) continue;
+
+		if(visitado[dest]){
+			menor_retorno[v] = min(menor_retorno[v], tempo_entrada[dest]);
+		}else{
+			dfs_cortes(dest, v);
+			menor_retorno[v] = min(menor_retorno[v], menor_retorno[dest]);
+
+			/* Se o vértice dest adjacente à v não alcançar outro cuja entrada na árvore DFS precede ou equivale a de v, a aresta (v, dest) é uma ponte e v um vértice de corte. */
+			if(menor_retorno[dest] > tempo_entrada[v]){
+
+//				cout << "Ponte (" << v << ", " << dest << ")" << endl;
+				for(int e = 0; e < a_; e++)
+					if(origem[e] == v && destino[e] == dest) arestas_ponte.push_back(e);
+                cout << "Vértice de corte: " << v << endl;
+
+			/* Se dest alcançar v, a aresta (v, dest) não é uma ponte mas v é um vértice de corte. */
+			}else if(menor_retorno[dest] == tempo_entrada[v]){
+
+                cout << "Vértice de corte: " << v << endl;
+
+			}
+		}
+	}
+}
+
+void pre_processamento(){
+
+	visitado.assign(v_, false);
+    tempo_entrada.assign(v_, -1);
+    menor_retorno.assign(v_, -1);
+
+	tempo_global = 0;
+
+/*	pontes e vértices de cortes */
+	for(int i = 0; i < v_; i++){
+		if(!visitado[i])
+			dfs_cortes(i);
+	}
+}
+
 ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 
 /*	cout << "callback executado!" << endl; */
+
+	vector<vector<int>> components;
+	vector<int> inserted(v_, 0);
+	int alocado = 0;
+	int novo;
+	int size_comp = 1;
+
+	vector<int> row;
+	vector<int> vertices_corte {0, 10, 11}; // corrigir e colocar no global -----------------------------------------
 
 /*  recupera o ambiente do cplex */
 	IloEnv env = getEnv();
@@ -66,8 +136,103 @@ ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 			IloExpr cut(env);
 			for(int value : arestas) cut += x[value];
 			double lhs = double(arestas.size() - 2);
-			cout << cut << " - " << lhs << " * " << *y[i] << " <= " << 2 <<  endl; 
+//			cout << cut << " - " << lhs << " * " << *y[i] << " <= " << 2 <<  endl; 
 			add(cut - lhs * *y[i] <= 2);
+		}
+	}
+/*  fim do corte pelas desigualdades (18) */
+
+/*  avalia se o grafo retornado tem mais de uma componente e, se sim, separa essas componentes */
+	do{
+
+		if(row.size() == 0){
+
+/*			cout << "component novo criado" << endl; */
+
+			for(int k = 0; k < v_; k++){
+
+				if(inserted[k] == 0){
+					row.push_back(k);
+					inserted[k] = 1;
+					alocado++;
+					break;
+				}
+			}
+		}else{
+
+			novo = 1;
+
+			for(int k : row){
+				for(int e = 0; e < a_; e++){
+
+					if(k == origem[e] && val[e] == 1 && inserted[destino[e]] == 0){
+/*						cout << "["<< origem[e] << "," << destino[e] << "]" << endl; */
+						row.push_back(destino[e]);
+						inserted[destino[e]] = 1;
+						alocado++;
+						novo = 0;
+					}
+
+					if(k == destino[e] && val[e] == 1 && inserted[origem[e]] == 0){
+/*						cout << "[" << origem[e] << "," << destino[e] << "]" << endl; */
+						row.push_back(origem[e]);
+						inserted[origem[e]] = 1;
+						alocado++;
+						novo = 0;
+					}
+				}
+			}
+
+			if(novo){
+				components.push_back(row);
+				row.clear();
+				size_comp++;
+			}
+		}
+
+	}while(alocado < 13);
+
+	components.push_back(row);
+
+	if(size_comp == 2){
+		for(const std::vector<int> &component : components){
+			if(component.size() > 2){
+				for(int cut_vertex : vertices_corte){
+					if(std::find(component.begin(), component.end(), cut_vertex) != component.end()){
+						for(int v1 = 0; v1 < component.size() - 1; v1++){
+							for(int v2 = v1 + 1; v2 < component.size(); v2++){
+
+								int encontrado = 0;
+								IloExpr cut(env);
+
+								for(int e = 0; e < a_; e++){
+									if(origem[e] == cut_vertex && destino[e] == component[v1]){ 
+										cut += x[e];
+										encontrado++;
+									}
+									if(destino[e] == cut_vertex && origem[e] == component[v1]){
+										cut += x[e];
+										encontrado++;
+									}
+									if(origem[e] == cut_vertex && destino[e] == component[v2]){
+										cut += x[e];
+										encontrado++;
+									}
+									if(destino[e] == cut_vertex && origem[e] == component[v2]){
+										cut += x[e];
+										encontrado++;
+									}
+								}
+
+/*								if(encontrado == 2 && y_val[cut_vertex] < 1){
+									add(cut - *y[cut_vertex] - 1 <= 0);
+									cout << "vertices: " << cut_vertex << ", (" << component[v1] << ", " << component[v2] << ")" << endl;
+								} */ // voltar com essa parte quando tivermos a informacao completa dos vertices separados pelo corte ------------------
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -89,7 +254,6 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
 
 	vector<vector<int>> components;
 	vector<int> inserted(v_, 0);
-	vector<int> inserted_(a_, 0);
 	int alocado = 0;
 	int novo;
 
@@ -167,7 +331,7 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
 
 			double rhs = double(component.size() - 1.0);
 			if(arestas_na_solucao > rhs){
-				cout << cut << " <= " << rhs << endl;
+//				cout << cut << " <= " << rhs << endl;
 				add(cut <= rhs);
 			}
 		}
@@ -175,7 +339,7 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
 }
 
 ILOHEURISTICCALLBACK1(HeuristicaPrimal, IloBoolVarArray, x) {
-	cout << "heuristica primal executada!" << endl;
+//	cout << "heuristica primal executada!" << endl;
 }
 
 int main(int argc, char * argv[]) {
@@ -216,9 +380,27 @@ int main(int argc, char * argv[]) {
 	v.resize(v_);
 	origem.resize(a_);
 	destino.resize(a_);
+	listaAdj.resize(v_);
+
+//	iota(v.begin(), v.end(), 0);
 
 	for(int i = 0; i < v_; i++) scanf("%d", &v[i]);
-	for(int i = 0; i < a_; i++) scanf("%d %d", &origem[i], &destino[i]);
+//	for(int i = 0; i < a_; i++) scanf("%d %d", &origem[i], &destino[i]);
+
+	int orig, dest;
+	for(int i = 0; i < a_; i++){
+		scanf("%d %d", &orig, &dest);
+
+		origem[i] = orig;
+		destino[i] = dest;
+
+		listaAdj[orig].push_back(dest);
+		listaAdj[dest].push_back(orig);
+	}
+
+    pre_processamento();
+
+	for(int value : arestas_ponte) cout << "aresta ponte: " << value + 14 << endl;
 
 /*  objeto que representa o modelo */
 	IloModel model(env);
@@ -256,6 +438,8 @@ int main(int argc, char * argv[]) {
 		}
 		model.add(constr_4 - 2 - 7 * *y[i] <= 0); /* ajustar o valor 100 para d(v) */
 	} 
+
+	for(int value : arestas_ponte) model.add(x_temp[value] == 1);
 
 /*  cria objeto do cplex */
 	IloCplex cplex(env);
