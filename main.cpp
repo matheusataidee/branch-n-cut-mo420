@@ -172,6 +172,51 @@ ILOUSERCUTCALLBACK1(CorteMinimo, IloBoolVarArray, x) {
   }
 }
 
+ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
+  cout << "Entrou no Lazy constraints" << endl;
+  /* Recupera ambiente do cplex */
+  IloEnv env = getEnv();
+
+  /* Pega a solução do LP. */
+  IloNumArray val(env);
+  getValues(val, x);
+
+  vector<int> r(v_);
+  vector<int> p(v_);
+  for (int i = 0; i < 1000; i++) {
+    for (int j = 0; j < v_; j++) makeSet(j, r, p);
+    int n_componentes = v_;
+    /* Contracao de arestas ate so restar dois vertices */
+    while (n_componentes > 2) {
+      int aresta = rand() % a_;
+      n_componentes -= uniteSets(origem[aresta], destino[aresta], r, p);
+    }
+
+    double cut = 0;
+    for (int j = 0; j < a_; j++) {
+      /* Somar arestas ligando os dois vertices resultantes */
+      if (findSet(origem[j], r, p) != findSet(destino[j], r, p))
+        cut += val[j];
+    }
+
+    /* Adicionando corte */
+    if (cut < 1) {
+      cout << "Cut pequeno encontrado na iteraçao: " << i << " cut: " << cut << endl;
+      for (int j = 0; j < v_; j++) {
+        cout << j << ": " << findSet(j, r, p) << endl;
+      }
+      IloExpr cut(env);
+      for (int j = 0; j < a_; j++) {
+        if (findSet(origem[j], r, p) != findSet(destino[j], r, p)) {
+          cut += x[j];
+        }
+      }
+      add(cut >= 1);
+      break;
+    }
+  }
+}
+
 int main(int argc, char * argv[]) {
 
   /* variaveis auxiliares */
@@ -314,6 +359,7 @@ int main(int argc, char * argv[]) {
   /* salva um arquivo ".lp" com o LP original */
   cplex.exportModel("LP.lp");
 
+	cplex.use(LazyConstraints(env, x));
   cplex.use(CorteMinimo(env, x));
 
   cplex.solve();
