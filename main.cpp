@@ -217,6 +217,98 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
   }
 }
 
+struct RegAux {
+  double valor;
+  int indice;
+  friend bool operator<(const RegAux &a, const RegAux &b) {
+    return (a.valor > b.valor);
+  }
+};
+
+ILOHEURISTICCALLBACK3(HeuristicaPrimal, IloBoolVarArray, x, IloBoolVarArray, y, IloBoolVarArray,  z) {
+  cout << "heuristica primal executada!" << endl;
+  IloNumArray val_x(getEnv());
+  IloNumArray val_y(getEnv());
+  IloNumArray val_z(getEnv());
+  getValues(val_x, x);
+  getValues(val_y, y);
+  getValues(val_z, z);
+
+  cout << "testOk() pre heuristica: " << testOk(val_x, val_y, val_z) << endl;
+  /* r e p sao vetores uteis para o algoritmo union-find */
+  vector<int> r(v_);
+  vector<int> p(v_);
+  vector<int> deg(v_, 0); /* grau dos vertices da solucao heuristica */
+  vector<bool> used(v_, false); /* util para marcar vars z durante bfs*/
+  vector<RegAux> arestas_ordenadas(a_);
+  for (int i = 0; i < v_; i++) makeSet(i, r, p);
+  for (int i = 0; i < a_; i++) {
+    arestas_ordenadas[i].valor = val_x[i];
+    arestas_ordenadas[i].indice = i;
+  }
+  sort(arestas_ordenadas.begin(), arestas_ordenadas.end());
+  /* Inicialmente cada vertice eh uma componente */
+  int n_components = v_;
+  for (int i = 0; i < a_; i++) {
+    int id = arestas_ordenadas[i].indice;
+    /* Caso em que a aresta conecta duas componentes */
+    if (uniteSets(origem[id], destino[id], r, p)) {
+      n_components--;
+      deg[origem[id]]++;  deg[destino[id]]++;
+      val_x[id] = 1.0;
+    } else {
+      val_x[id] = 0.0;
+    }
+  }
+  double custo = 0;
+  /* Demarca variaveis y correspondentes a vertices de ramificacoes */
+  for (int i = 0; i < v_; i++) {
+    if (deg[i] >= 3) {
+      val_y[i] = 1.0;
+      custo += 1;
+    } else {
+      val_y[i] = 0.0;
+    }
+  }
+
+  /* BFS partindo de root (vertice 0) para marcar variaveis z corretamente
+      Eh necessario pois necessita do sentido das arestas, que eh o mesmo
+      sentido em que se percorre o grafo por uma bfs partindo de root.*/
+  queue<int> myq;
+  used[0] = true;
+  myq.push(0);
+  while (!myq.empty()) {
+    int node = myq.front(); myq.pop();
+    for (int i = 0; i < a_; i++) {
+      if (origem[i] != node && destino[i] != node) continue;
+      int to = origem[i] + destino[i] - node;
+      if (used[to]) continue;
+      used[to] = true;
+      myq.push(to);
+      if (origem[i] == node) {
+        val_z[2 * i] = 1.0;
+        val_z[2 * i + 1] = 0.0;
+      } else {
+        val_z[2 * i] = 0.0;
+        val_z[2 * i + 1] = 1.0;
+      }
+    }
+  }
+  /* Mescla variaveis nas estruturas correspondentes */
+  IloNumVarArray vars(getEnv());
+  IloNumArray vals(getEnv());
+  for (int i = 0; i < a_; i++)      vars.add(x[i]);
+  for (int i = 0; i < v_; i++)      vars.add(y[i]);
+  for (int i = 0; i < 2 * a_; i++)  vars.add(z[i]);
+
+  for (int i = 0; i < a_; i++)      vals.add(val_x[i]);
+  for (int i = 0; i < v_; i++)      vals.add(val_y[i]);
+  for (int i = 0; i < 2 * a_; i++)  vals.add(val_z[i]);
+
+  setSolution(vars, vals, custo);
+  cout << "testOk() pos heuristica: " << testOk(val_x, val_y, val_z) << endl;
+}
+
 int main(int argc, char * argv[]) {
 
   /* variaveis auxiliares */
@@ -359,6 +451,8 @@ int main(int argc, char * argv[]) {
   /* salva um arquivo ".lp" com o LP original */
   cplex.exportModel("LP.lp");
 
+
+  cplex.use(HeuristicaPrimal(env, x, y, z));
 	cplex.use(LazyConstraints(env, x));
   cplex.use(CorteMinimo(env, x));
 
