@@ -34,7 +34,6 @@ IloBoolVarArray* y_global;
 IloBoolVarArray* x_global;     
 
 /* ---- conjunto de variaveis ainda nao utilizadas devidamente (estavam no exemplo) ---- */
-
 	
 	int totcuts = 0; /* contador do total de cortes por nó da arvore B&B */
 	int itersep = 0; /* contador do total de lacos de separacao de cortes por nó da arvore B&B */
@@ -60,6 +59,36 @@ enum ModelType {
   ILP,
   HYBRID
 };
+
+struct RegAux {
+	double valor;
+	int indice;
+	friend bool operator<(const RegAux& a, const RegAux& b) {
+		return (a.valor > b.valor);
+	}
+};
+
+void dfs(int v, vector<vector<int>> lista_adj){
+
+	if (!visitado[v]) {
+		visitado[v] = true;
+		for (int adj: lista_adj[v]) {
+			if (!visitado[adj])
+				dfs(adj, lista_adj);
+		}
+	}
+}
+
+bool is_connected(vector<vector<int>> lista_adj){
+
+	visitado.assign(v_, false);
+	dfs(0, lista_adj);
+	for(int i = 0; i < v_; i++){
+		if(i > 0 && !visitado[i]) /* DFS não alcançou nó */
+			return false;
+	}
+	return true;
+}
 
 void imprime_solucao(ModelType model_type, int timelimit, int use_primal_heur, string input_path, IloNumArray xstar, double diff_time){
 
@@ -412,8 +441,117 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
 	}
 }
 
-ILOHEURISTICCALLBACK1(HeuristicaPrimal, IloBoolVarArray, x) {
-	cout << "heuristica primal executada!" << endl;
+ILOHEURISTICCALLBACK2(HeuristicaPrimal, IloBoolVarArray, y, IloBoolVarArray, x) {
+
+/*  recupera o ambiente do cplex */
+	IloEnv env = getEnv();
+
+	vector<vector<int>> lista_adj_h(v_);
+	vector<int> arestas;
+
+	// Recupera a solução vigente
+	IloNumArray x_val(getEnv());
+	getValues(x_val, x);
+
+	IloNumArray y_val(getEnv());
+	getValues(y_val, y);
+
+
+	// Vetor de registros
+	vector<RegAux> xh(a_);
+	for(int i = 0; i < a_; i++){
+		xh[i].valor = x_val[i];
+		xh[i].indice = i;
+	}
+
+	// Ordenar em ordem decrescente de valor
+	sort(xh.begin(), xh.end());
+
+	/* Construir grafo inserindo arestas na ordem de maior para o
+	menor valor da relaxação até ser conexo. */
+
+
+	for(RegAux exh : xh){
+		int u = origem[exh.indice];
+		int v = destino[exh.indice];
+
+		arestas.push_back(exh.indice);
+		lista_adj_h[u].push_back(v);
+		lista_adj_h[v].push_back(u);
+
+		if(is_connected(lista_adj_h)) break;
+	}
+
+	// Remover arestas até só ter |V| - 1 e continuar conexo
+
+	int i = 0;
+	vector<vector<int>> list_adj_h;
+
+	while(list_adj_h.size() > v_ - 1){
+		for(int e = i; e < a_; e++){
+			RegAux reg = xh[e];
+
+			int u = origem[reg.indice];
+			int v = destino[reg.indice];
+
+			vector<vector<int>> list_copy = list_adj_h;
+
+			// Remover e
+			for(int j = 0; j < list_copy[u].size(); j++)
+				if(list_copy[u][j] == v){
+					list_copy[u].erase(list_copy[u].begin() + j);
+					break;
+				}
+
+			for(int j = 0; j < list_copy[v].size(); j++)
+				if(list_copy[v][j] == u){
+					list_copy[v].erase(list_copy[v].begin() + j);
+					break;
+				}
+
+			// Verificar se continua conexo
+			if(is_connected(list_copy)){
+				for(int j = 0; j < arestas.size(); j++)
+					if(arestas[j] == e){
+						arestas.erase(arestas.begin() + j);
+						break;
+					}
+				list_adj_h = list_copy;
+				i = e + 1;
+				break;
+			}
+		}
+	}
+
+	// Informar a solução CPLEX
+	for (int e = 0; e < a_; e++) {
+
+		if(find(arestas.begin(), arestas.end(), e) != arestas.end())
+			x_val[e] = 1.0;
+		else
+			x_val[e] = 0.0;
+	}
+
+	int custo;
+
+	for(int u = 0; u < v_; u++){
+		if(lista_adj_h[u].size() >= 3){
+			y_val[u] = 1.0;
+			custo += 1;
+		}else
+			y_val[u] = 0.0;
+	}
+
+//	IloNumVar[] var_yx = new IloNumVar[v_ + a_];
+	IloNumVarArray var_yx(env);
+	for(int i = 0; i < v_; i++) var_yx.add(y[i]);
+	for(int i = 0; i < a_; i++) var_yx.add(x[i]); 
+
+	IloNumArray val_yx(env);
+	for(int i = 0; i < v_; i++) val_yx.add(y_val[i]);
+	for(int i = 0; i < a_; i++) val_yx.add(x_val[i]); 
+
+	setSolution(var_yx, val_yx, custo);
 }
 
 int main(int argc, char * argv[]) {
@@ -540,7 +678,7 @@ int main(int argc, char * argv[]) {
 	cplex.extract(model);
 
 /*  silencia o cplex no terminal */
-	cplex.setOut(env.getNullStream());
+//	cplex.setOut(env.getNullStream());
 
 /*  atribui valores aos diferentes parametros de controle do CPLEX */
 	cplex.setParam(IloCplex::Param::TimeLimit, timelimit);
@@ -556,7 +694,7 @@ int main(int argc, char * argv[]) {
 /*  salva um arquivo ".lp" com o LP original */
 	cplex.exportModel("LP.lp");
 
-	if(use_primal_heur == 1) cplex.use(HeuristicaPrimal(env, x_temp));
+	if(use_primal_heur == 1) cplex.use(HeuristicaPrimal(env, y_temp, x_temp));
 	cplex.use(LazyConstraints(env, x_temp));
 	cplex.use(Cortes(env, x_temp));
 
