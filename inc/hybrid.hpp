@@ -20,13 +20,43 @@ extern vector<int> destino;
 extern vector<vector<int> > g;
 extern map<pair<int, int>, int> edge_to_index;
 
-struct RegAux {
-  double valor;
-  int indice;
-  friend bool operator<(const RegAux &a, const RegAux &b) {
-    return (a.valor > b.valor);
-  }
-};
+extern map<int, IloBoolVar*> y; /* dicionario de ponteiros para as variaveis Y */
+extern map<std::string, IloBoolVar*> x; /* dicionario de ponteiros para as variaveis X */  
+extern vector<int> arestas_ponte; /* armazena as pontes encontradas no pre processamento */
+extern vector<int> vertices_corte; /* armazena os vertices de corte encontrados no pre processamento */
+
+/* declaracao das necessidades do pre processamento */
+extern vector<vector<int>> listaAdj;
+extern int tempo_global;
+extern vector<bool> visitado;
+extern vector<int> tempo_entrada; /* Tempo que a árvore DFS chega em v */
+extern vector<int> menor_retorno; /* Menor tempo de entrada que v alcança na árvore DFS */
+
+// void pre_processamento();
+// void dfs_cortes(int v, int pai = -1);
+
+extern IloBoolVarArray* y_global;     
+extern IloBoolVarArray* x_global;     
+
+/* ---- conjunto de variaveis ainda nao utilizadas devidamente (estavam no exemplo) ---- */
+	
+	extern int totcuts; /* contador do total de cortes por nó da arvore B&B */
+	extern int itersep; /* contador do total de lacos de separacao de cortes por nó da arvore B&B */
+	extern int MAX_NODE_DEPTH_FOR_SEP; /* profundidade maxima de um no da arvore de B&B em que sera feita separacao */
+	extern double objval_relax; /* valor otimo da primeira relaxacao */
+	extern double objval_node1; /* valor da relaxacao linear no final do 1o nó */
+
+	extern double zstar; /* melhor limitante primal encontrado */
+	extern double melhor_limitante_dual; /* melhor limitante dual encontrado */
+	extern int incumbent_node; /* no do melhor limitante primal encontrado */
+
+	extern int contador_sec;
+	extern int contador_d18;
+	extern int contador_d19;
+	extern int contador_d34;
+	extern int total_no_exp;
+
+	extern IloInt node_depth; /* profundidade do nó */
 
 /* Corte baseado em min-cut do grafo
   O algoritmo utilizado é o Karger's Algorithm, onde

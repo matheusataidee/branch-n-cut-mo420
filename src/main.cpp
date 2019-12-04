@@ -8,6 +8,7 @@
 #include <queue>
 #include <set>
 #include <cstdlib>
+#include <chrono>
 
 #include "utils.hpp"
 #include "hybrid.hpp"
@@ -24,27 +25,45 @@ int a_;              /* número de itens */
 vector<int> v;   /* custos */
 vector<int> origem;
 vector<int> destino;
-vector<int> w;      /* pesos */
 vector<vector<int> > g(v_, vector<int>()); /* grafo de entrada em lista de adjacencias */
 map<pair<int, int>, int> edge_to_index; /* mapeia aresta no indice correspondente */
-int W;              /* capacidade */
-/* contador do total de cortes por nó da arvore B&B */
-int totcuts=0;
-/* contador do total de lacos de separacao de cortes por nó da arvore B&B */
-int itersep=0;
-/* profundidade maxima de um no da arvore de B&B em que sera feita separacao */
-int MAX_NODE_DEPTH_FOR_SEP=1000000;
-/* - valor otimo da primeira relaxacao */
-double objval_relax;
-/* - valor da relaxacao linear no final do 1o nó */
-double objval_node1;
-/* Profundidade do nó */
-IloInt node_depth;
+map<int, IloBoolVar*> y; /* dicionario de ponteiros para as variaveis Y */
+map<std::string, IloBoolVar*> x; /* dicionario de ponteiros para as variaveis X */  
+vector<int> arestas_ponte; /* armazena as pontes encontradas no pre processamento */
+vector<int> vertices_corte; /* armazena os vertices de corte encontrados no pre processamento */
 
-enum ModelType {
-  ILP,
-  HYBRID
-};
+/* declaracao das necessidades do pre processamento */
+vector<vector<int>> listaAdj;
+int tempo_global;
+vector<bool> visitado;
+vector<int> tempo_entrada; /* Tempo que a árvore DFS chega em v */
+vector<int> menor_retorno; /* Menor tempo de entrada que v alcança na árvore DFS */
+
+// void pre_processamento();
+// void dfs_cortes(int v, int pai = -1);
+
+IloBoolVarArray* y_global;     
+IloBoolVarArray* x_global;     
+
+/* ---- conjunto de variaveis ainda nao utilizadas devidamente (estavam no exemplo) ---- */
+	
+	int totcuts = 0; /* contador do total de cortes por nó da arvore B&B */
+	int itersep = 0; /* contador do total de lacos de separacao de cortes por nó da arvore B&B */
+	int MAX_NODE_DEPTH_FOR_SEP = 1000000; /* profundidade maxima de um no da arvore de B&B em que sera feita separacao */
+	double objval_relax; /* valor otimo da primeira relaxacao */
+	double objval_node1; /* valor da relaxacao linear no final do 1o nó */
+
+	double zstar; /* melhor limitante primal encontrado */
+	double melhor_limitante_dual; /* melhor limitante dual encontrado */
+	int incumbent_node = -1; /* no do melhor limitante primal encontrado */
+
+	int contador_sec = 0;
+	int contador_d18 = 0;
+	int contador_d19 = 0;
+	int contador_d34 = 0;
+	int total_no_exp = 0;
+
+	IloInt node_depth; /* profundidade do nó */
 
 int main(int argc, char * argv[]) {
 
