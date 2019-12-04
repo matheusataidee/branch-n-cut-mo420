@@ -130,6 +130,46 @@ void imprime_solucao(ModelType model_type, int timelimit, int use_primal_heur, s
 	file.close();
 }
 
+void imprime_solucao(ModelType model_type, int timelimit, int use_primal_heur, string input_path, double diff_time){
+
+/*	escrita do arquivo .sol */
+	ofstream file_sol(input_path + ".sol");
+
+	if(!model_type) file_sol << "s " << timelimit << " " << use_primal_heur << " " << input_path << endl;
+
+	for(int value = 0; value < (v_ - 1); value++) 
+		file_sol << -1 << " " << -1 << endl;
+
+	file_sol.close();
+
+/*	escrita do arquivo .est */
+	ofstream file(input_path + ".est");
+
+	if(!model_type) file << "s " << timelimit << " " << use_primal_heur << " " << input_path << endl;
+	file << contador_sec << endl; /* int */
+	file << contador_d18 << endl; /* int */
+	file << contador_d19 << endl; /* int */
+	file << contador_d34 << endl; /* int */
+
+	file.precision(6);	
+	file.setf(ios::fixed);
+	file << objval_relax << endl; /* double */
+	file << objval_node1 << endl; /* double */
+
+	file.precision(0);	
+	file.setf(ios::fixed);
+	file << total_no_exp << endl; /* int */
+	file << incumbent_node << endl; /* int */
+	file << zstar << endl; /* int */
+
+	file.precision(6);	
+	file.setf(ios::fixed);
+	file << melhor_limitante_dual << endl; /* double */
+	file << diff_time << endl; /* double */
+
+	file.close();
+}
+
 void dfs_cortes(int v, int pai = -1){
 
 	visitado[v] = true;
@@ -182,6 +222,36 @@ void pre_processamento(){
 	}
 }
 
+void makeSet(int v, vector<int>& r, vector<int>& p){ 
+	p[v] = v; r[v] = 0; 
+}
+
+int findSet(int v, vector<int>& r, vector<int>& p){
+	return v == p[v] ? v : p[v] = findSet(p[v], r, p);
+} 
+
+int uniteSets(int a, int b, vector<int>& r, vector<int>& p){
+
+	a = findSet(a, r, p);
+	b = findSet(b, r, p);
+
+	if (a != b) {
+		if(r[a] < r[b])
+			swap(a, b);
+
+		p[b] = a; 
+
+		if(r[a] == r[b])
+			r[a]++;
+ 
+		return 1;
+
+	}else{
+
+		return 0;
+	}
+}
+
 ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 
 /*	cout << "callback executado!" << endl; */
@@ -208,9 +278,9 @@ ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 	for(int i = 0; i < v_; i++){
 		vector<int> arestas;
 		for(int e = 0; e < a_; e++)
-			if(val[e] == 1 && (i == origem[e] || i == destino[e])) arestas.push_back(e);
+			if(val[e] > 1.0 - EPSILON && (i == origem[e] || i == destino[e])) arestas.push_back(e);
 
-		if(arestas.size() > 2 && y_val[i] < 1.0){
+		if(arestas.size() > 2 && y_val[i] < 1.0 - EPSILON){
 			IloExpr cut(env);
 			for(int value : arestas) cut += x[value];
 			double lhs = double(arestas.size() - 2);
@@ -323,7 +393,7 @@ ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 										}
 									}
 /*								cria os cortes representados pelas desigualdades validas do tipo (19) */
-								if(encontrado == 2 && y_val[cut_vertex] < 1){
+								if(encontrado == 2 && y_val[cut_vertex] < 1 - EPSILON){
 										add(cut - *y[cut_vertex] - 1 <= 0);
 										contador_d19++;
 //										for(int z : component) cout << z << " ";
@@ -342,103 +412,47 @@ ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 
 ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
 
-//	cout << "lazy constraint executado!" << endl;
-
-/*  recupera o ambiente do cplex */
+/*	recupera ambiente do cplex */
 	IloEnv env = getEnv();
 
-/*  pega a solução vigente */
+/*	pega a solução do LP. */
 	IloNumArray val(env);
 	getValues(val, x);
 
-	IloNumArray y_val(env);
-	getValues(y_val, *y_global);
+	vector<int> r(v_);
+	vector<int> p(v_);
 
-	vector<vector<int>> components;
-	vector<int> inserted(v_, 0);
-	int alocado = 0;
-	int novo;
+	for(int i = 0; i < 1000; i++){
 
-	vector<int> row;
+		for (int j = 0; j < v_; j++) makeSet(j, r, p);
+		int n_componentes = v_;
 
-/*  avalia se o grafo retornado tem mais de uma componente e, se sim, separa essas componentes */
-	do{
-
-		if(row.size() == 0){
-
-/*			cout << "component novo criado" << endl; */
-
-			for(int k = 0; k < v_; k++){
-
-				if(inserted[k] == 0){
-					row.push_back(k);
-					inserted[k] = 1;
-					alocado++;
-					break;
-				}
-			}
-		}else{
-
-			novo = 1;
-
-			for(int k : row){
-				for(int e = 0; e < a_; e++){
-
-					if(k == origem[e] && val[e] == 1 && inserted[destino[e]] == 0){
-/*						cout << "["<< origem[e] << "," << destino[e] << "]" << endl; */
-						row.push_back(destino[e]);
-						inserted[destino[e]] = 1;
-						alocado++;
-						novo = 0;
-					}
-
-					if(k == destino[e] && val[e] == 1 && inserted[origem[e]] == 0){
-/*						cout << "[" << origem[e] << "," << destino[e] << "]" << endl; */
-						row.push_back(origem[e]);
-						inserted[origem[e]] = 1;
-						alocado++;
-						novo = 0;
-					}
-				}
-			}
-
-			if(novo){
-				components.push_back(row);
-				row.clear();
-			}
+/*		Contracao de arestas ate so restar dois vertices */
+		while(n_componentes > 2){
+			int aresta = rand() % a_;
+			n_componentes -= uniteSets(origem[aresta], destino[aresta], r, p);
 		}
 
-	}while(alocado < v_);
+		double cut = 0;
+		for(int j = 0; j < a_; j++){
+/* 			somar arestas ligando os dois vertices resultantes */
+			if(findSet(origem[j], r, p) != findSet(destino[j], r, p))
+				cut += val[j];
+		}
 
-	components.push_back(row);
-
-/*  cria uma restrição tipo mochila (para cada componente) para suprimir subcilclos nas componentes encontradas */
-	for(const std::vector<int> &component : components){
-
-		if(component.size() < v_){
-
-/*			for(int value : component) std::cout << value << ' ';
-			std::cout << std::endl; */
-
+/* 		adicionando corte */
+		if(cut < 1){
 			IloExpr cut(env);
-			int arestas_na_solucao = 0;
-			for(int e = 0; e < a_; e++){
+			for(int j = 0; j < a_; j++)
+				if(findSet(origem[j], r, p) != findSet(destino[j], r, p))
+					cut += x[j];
 
-				if(std::find(component.begin(), component.end(), origem[e]) != component.end() && std::find(component.begin(), component.end(), destino[e]) != component.end()){
-					cut += x[e];
-					if(val[e] == 1) arestas_na_solucao++;
-				}
-
-			}
-
-			double rhs = double(component.size() - 1.0);
-			if(arestas_na_solucao > rhs){
-//				cout << cut << " <= " << rhs << endl;
-				add(cut <= rhs);
-				contador_sec++;
-			}
+			add(cut >= 1);
+			contador_sec++;
+			break;
 		}
 	}
+
 }
 
 ILOHEURISTICCALLBACK2(HeuristicaPrimal, IloBoolVarArray, y, IloBoolVarArray, x) {
@@ -625,7 +639,6 @@ int main(int argc, char * argv[]) {
 	file.close();
 
     pre_processamento();
-	cout << "pre processamento" << endl;
 
 //	for(int value : arestas_ponte) cout << "aresta ponte: " << value + 14 << " - (" << origem[value] << ", " << destino[value] << ")" << endl;
 //	for(int value : vertices_corte) cout << "vertices corte: " << value << endl;
@@ -669,7 +682,7 @@ int main(int argc, char * argv[]) {
 		model.add(constr_4 - 2 - 7 * *y[i] <= 0); /* ajustar o valor 100 para d(v) */
 	} 
 
-	for(int value : arestas_ponte) model.add(x_temp[value] == 1);
+//	for(int value : arestas_ponte) model.add(x_temp[value] == 1);
 
 /*  cria objeto do cplex */
 	IloCplex cplex(env);
@@ -698,33 +711,50 @@ int main(int argc, char * argv[]) {
 	cplex.use(LazyConstraints(env, x_temp));
 	cplex.use(Cortes(env, x_temp));
 
-	cplex.solve();
+	bool achou_solucao;
 
-	incumbent_node = cplex.getIncumbentNode();
-	zstar = cplex.getObjValue();
-	melhor_limitante_dual = cplex.getBestObjValue();
-	total_no_exp = cplex.getNnodes();
+	if(cplex.solve()){
 
-	cout << "solucao otima: " << zstar << endl << endl;
+		incumbent_node = cplex.getIncumbentNode();
+		zstar = cplex.getObjValue();
+		melhor_limitante_dual = cplex.getBestObjValue();
+		total_no_exp = cplex.getNnodes();
 
-	IloNumArray ystar(env);
-	cplex.getValues(ystar, y_temp);
-/*	cout << "valores de y:" << endl;
-	for(int i = 0; i < v_; i++){
-		if(ystar[i] > 0) cout << "\ty[" << i << "]: " << ystar[i] << endl;
-	} */
+	//	cout << "solucao otima: " << zstar << endl << endl;
 
-	IloNumArray xstar(env);
-	cplex.getValues(xstar, x_temp);
-/*	cout << endl << "valores de x:" << endl;
-	for(int i = 0; i < a_; i++){
-		if(xstar[i] > 0) cout << "\tx[" << origem[i] << "," << destino[i] << "]: " << xstar[i] << endl;
-	} */
+		IloNumArray ystar(env);
+		cplex.getValues(ystar, y_temp);
+	/*	cout << "valores de y:" << endl;
+		for(int i = 0; i < v_; i++){
+			if(ystar[i] > 0) cout << "\ty[" << i << "]: " << ystar[i] << endl;
+		} */
 
-	chrono::high_resolution_clock::time_point now = chrono::high_resolution_clock::now();
-	chrono::duration<double> diff_time = chrono::duration_cast<chrono::duration<double>>(now - start);
+		IloNumArray xstar(env);
+		cplex.getValues(xstar, x_temp);
+	/*	cout << endl << "valores de x:" << endl;
+		for(int i = 0; i < a_; i++){
+			if(xstar[i] > 0) cout << "\tx[" << origem[i] << "," << destino[i] << "]: " << xstar[i] << endl;
+		} */
 
-	imprime_solucao(model_type, timelimit, use_primal_heur, input_path, xstar, diff_time.count());
+		chrono::high_resolution_clock::time_point now = chrono::high_resolution_clock::now();
+		chrono::duration<double> diff_time = chrono::duration_cast<chrono::duration<double>>(now - start);
+
+		imprime_solucao(model_type, timelimit, use_primal_heur, input_path, xstar, diff_time.count());
+
+	}else{
+		printf("Main: programa terminou sem achar solucao inteira !\n");
+
+		incumbent_node = -1;
+		zstar = -1;
+		melhor_limitante_dual = cplex.getBestObjValue();
+		total_no_exp = cplex.getNnodes();
+
+		chrono::high_resolution_clock::time_point now = chrono::high_resolution_clock::now();
+		chrono::duration<double> diff_time = chrono::duration_cast<chrono::duration<double>>(now - start);
+
+		
+		imprime_solucao(model_type, timelimit, use_primal_heur, input_path, diff_time.count());
+	}
 
 	return 0;
 }
