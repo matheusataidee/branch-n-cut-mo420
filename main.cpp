@@ -6,6 +6,7 @@
 #include <string>
 #include <fstream>
 #include <queue>
+#include <set>
 #include <cstdlib>
 
 #include "ilcplex/ilocplex.h"
@@ -21,6 +22,8 @@ vector<int> v;   /* custos */
 vector<int> origem;
 vector<int> destino;
 vector<int> w;      /* pesos */
+vector<vector<int> > g(v_, vector<int>()); /* grafo de entrada em lista de adjacencias */
+map<pair<int, int>, int> edge_to_index; /* mapeia aresta no indice correspondente */
 int W;              /* capacidade */
 /* contador do total de cortes por nó da arvore B&B */
 int totcuts=0;
@@ -181,39 +184,36 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
   IloNumArray val(env);
   getValues(val, x);
 
-  vector<int> r(v_);
-  vector<int> p(v_);
-  for (int i = 0; i < 1000; i++) {
-    for (int j = 0; j < v_; j++) makeSet(j, r, p);
-    int n_componentes = v_;
-    /* Contracao de arestas ate so restar dois vertices */
-    while (n_componentes > 2) {
-      int aresta = rand() % a_;
-      n_componentes -= uniteSets(origem[aresta], destino[aresta], r, p);
-    }
-
-    double cut = 0;
-    for (int j = 0; j < a_; j++) {
-      /* Somar arestas ligando os dois vertices resultantes */
-      if (findSet(origem[j], r, p) != findSet(destino[j], r, p))
-        cut += val[j];
-    }
-
-    /* Adicionando corte */
-    if (cut < 1) {
-      cout << "Cut pequeno encontrado na iteraçao: " << i << " cut: " << cut << endl;
-      for (int j = 0; j < v_; j++) {
-        cout << j << ": " << findSet(j, r, p) << endl;
-      }
-      IloExpr cut(env);
-      for (int j = 0; j < a_; j++) {
-        if (findSet(origem[j], r, p) != findSet(destino[j], r, p)) {
-          cut += x[j];
+  vector<set<int> > components;
+  vector<int> used(v_, false);
+  for (int i = 0; i < v_; i++) {
+    if (!used[i]) {
+      set<int> comp;
+      queue<int> myq;
+      myq.push(i);
+      while (!myq.empty()) {
+        int p = myq.front();  myq.pop();
+        comp.insert(p);
+        for (int i = 0; i < g[p].size(); i++) {
+          int to = g[p][i];
+          if (!used[to] && val[edge_to_index[{p, to}] / 2] == 1) {
+            used[to] = true;
+            myq.push(to);
+          }
         }
       }
-      add(cut >= 1);
-      break;
+      components.push_back(comp);
     }
+  }
+  for (int i = 0; i < components.size(); i++) {
+    IloExpr cut(env);
+    for (int e = 0; e < a_; e++) {
+      if (components[i].count(origem[e]) && components[i].count(destino[e])) {
+        cut += x[e];
+      }
+    }
+    double rhs = components[i].size() - 1.0;
+    add(cut <= rhs);
   }
 }
 
@@ -337,8 +337,7 @@ int main(int argc, char * argv[]) {
   fin >> v_ >> a_;
 
   int root = 0; // No raiz, escolhido arbitrariamente
-  vector<vector<int> > g(v_, vector<int>());
-  map<pair<int, int>, int> edge_to_index;
+  g = vector<vector<int> >(v_, vector<int>());
   v.resize(v_);
   origem.resize(a_);
   destino.resize(a_);
