@@ -457,115 +457,60 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
 
 ILOHEURISTICCALLBACK2(HeuristicaPrimal, IloBoolVarArray, y, IloBoolVarArray, x) {
 
-/*  recupera o ambiente do cplex */
-	IloEnv env = getEnv();
+	IloNumArray val_x(getEnv());
+	IloNumArray val_y(getEnv());
+	getValues(val_x, x);
+	getValues(val_y, y);
 
-	vector<vector<int>> lista_adj_h(v_);
-	vector<int> arestas;
+//  cout << "testOk() pre heuristica: " << testOk(val_x, val_y, val_z) << endl;
+  /* r e p sao vetores uteis para o algoritmo union-find */
+	vector<int> r(v_);
+	vector<int> p(v_);
+	vector<int> deg(v_, 0); /* grau dos vertices da solucao heuristica */
+	vector<bool> used(v_, false); /* util para marcar vars z durante bfs*/
+	vector<RegAux> arestas_ordenadas(a_);
 
-	// Recupera a solução vigente
-	IloNumArray x_val(getEnv());
-	getValues(x_val, x);
-
-	IloNumArray y_val(getEnv());
-	getValues(y_val, y);
-
-
-	// Vetor de registros
-	vector<RegAux> xh(a_);
-	for(int i = 0; i < a_; i++){
-		xh[i].valor = x_val[i];
-		xh[i].indice = i;
+	for (int i = 0; i < v_; i++) makeSet(i, r, p);
+	for (int i = 0; i < a_; i++) {
+		arestas_ordenadas[i].valor = val_x[i];
+		arestas_ordenadas[i].indice = i;
 	}
 
-	// Ordenar em ordem decrescente de valor
-	sort(xh.begin(), xh.end());
-
-	/* Construir grafo inserindo arestas na ordem de maior para o
-	menor valor da relaxação até ser conexo. */
-
-
-	for(RegAux exh : xh){
-		int u = origem[exh.indice];
-		int v = destino[exh.indice];
-
-		arestas.push_back(exh.indice);
-		lista_adj_h[u].push_back(v);
-		lista_adj_h[v].push_back(u);
-
-		if(is_connected(lista_adj_h)) break;
+	sort(arestas_ordenadas.begin(), arestas_ordenadas.end());
+  /* Inicialmente cada vertice eh uma componente */
+	int n_components = v_;
+	for (int i = 0; i < a_; i++) {
+		int id = arestas_ordenadas[i].indice;
+			/* Caso em que a aresta conecta duas componentes */
+		if (uniteSets(origem[id], destino[id], r, p)) {
+			n_components--;
+			deg[origem[id]]++;  deg[destino[id]]++;
+			val_x[id] = 1.0;
+		}else{
+			val_x[id] = 0.0;
+		}
 	}
-
-	// Remover arestas até só ter |V| - 1 e continuar conexo
-
-	int i = 0;
-	vector<vector<int>> list_adj_h;
-
-	while(list_adj_h.size() > v_ - 1){
-		for(int e = i; e < a_; e++){
-			RegAux reg = xh[e];
-
-			int u = origem[reg.indice];
-			int v = destino[reg.indice];
-
-			vector<vector<int>> list_copy = list_adj_h;
-
-			// Remover e
-			for(int j = 0; j < list_copy[u].size(); j++)
-				if(list_copy[u][j] == v){
-					list_copy[u].erase(list_copy[u].begin() + j);
-					break;
-				}
-
-			for(int j = 0; j < list_copy[v].size(); j++)
-				if(list_copy[v][j] == u){
-					list_copy[v].erase(list_copy[v].begin() + j);
-					break;
-				}
-
-			// Verificar se continua conexo
-			if(is_connected(list_copy)){
-				for(int j = 0; j < arestas.size(); j++)
-					if(arestas[j] == e){
-						arestas.erase(arestas.begin() + j);
-						break;
-					}
-				list_adj_h = list_copy;
-				i = e + 1;
-				break;
-			}
+	double custo = 0;
+  /* Demarca variaveis y correspondentes a vertices de ramificacoes */
+	for (int i = 0; i < v_; i++) {
+		if (deg[i] >= 3) {
+				val_y[i] = 1.0;
+				custo += 1;
+			}else{
+				val_y[i] = 0.0;
 		}
 	}
 
-	// Informar a solução CPLEX
-	for (int e = 0; e < a_; e++) {
+	IloNumVarArray vars(getEnv());
+	IloNumArray vals(getEnv());
 
-		if(find(arestas.begin(), arestas.end(), e) != arestas.end())
-			x_val[e] = 1.0;
-		else
-			x_val[e] = 0.0;
-	}
+	for (int i = 0; i < a_; i++) vars.add(x[i]);
+	for (int i = 0; i < v_; i++) vars.add(y[i]);
 
-	int custo;
+	for (int i = 0; i < a_; i++) vals.add(val_x[i]);
+	for (int i = 0; i < v_; i++) vals.add(val_y[i]);
 
-	for(int u = 0; u < v_; u++){
-		if(lista_adj_h[u].size() >= 3){
-			y_val[u] = 1.0;
-			custo += 1;
-		}else
-			y_val[u] = 0.0;
-	}
-
-//	IloNumVar[] var_yx = new IloNumVar[v_ + a_];
-	IloNumVarArray var_yx(env);
-	for(int i = 0; i < v_; i++) var_yx.add(y[i]);
-	for(int i = 0; i < a_; i++) var_yx.add(x[i]); 
-
-	IloNumArray val_yx(env);
-	for(int i = 0; i < v_; i++) val_yx.add(y_val[i]);
-	for(int i = 0; i < a_; i++) val_yx.add(x_val[i]); 
-
-	setSolution(var_yx, val_yx, custo);
+	setSolution(vars, vals, custo);
 }
 
 int main(int argc, char * argv[]) {
