@@ -1,3 +1,4 @@
 *.o
-bnb
+bnc
 LP.lp
+.vscode/
