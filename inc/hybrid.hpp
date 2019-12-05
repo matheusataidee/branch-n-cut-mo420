@@ -85,6 +85,25 @@ ILOUSERCUTCALLBACK3(CortesHybrid, IloBoolVarArray, x, IloBoolVarArray, y, IloBoo
     vector<int> arestas;
     for (int j = 0; j < g[i].size(); j++) {
       int to = g[i][j];
+      if (valx[edge_to_index[{i, to}] / 2] > 1 - EPSILON) {
+        arestas.push_back(edge_to_index[{i, to}] / 2);
+      }
+    }
+    if (arestas.size() > 2 && valy[i] < 1 - EPSILON) {
+      IloExpr cut(env);
+      for (int aresta : arestas) {
+        cut += x[aresta];
+      }
+      int rhs = arestas.size() - 2;
+      add(cut - 2 <= rhs * y[i]);
+      contador_d18++;
+    }
+  }
+
+  for (int i = 0; i < v_; i++) {
+    vector<int> arestas;
+    for (int j = 0; j < g[i].size(); j++) {
+      int to = g[i][j];
       if (valz[edge_to_index[{i, to}]] > 1 - EPSILON) {
         arestas.push_back(edge_to_index[{i, to}]);
       }
