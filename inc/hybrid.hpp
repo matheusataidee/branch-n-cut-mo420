@@ -67,15 +67,38 @@ extern IloBoolVarArray* x_global;
       cada um dos dois vertices resultantes
     - Verifica se essa soma de pesos eh menor que um
     - Caso seja, o corte eh adicionado*/
-ILOUSERCUTCALLBACK1(CortesHybrid, IloBoolVarArray, x) {
+ILOUSERCUTCALLBACK3(CortesHybrid, IloBoolVarArray, x, IloBoolVarArray, y, IloBoolVarArray, z) {
   cout << "Entrei no callback" << endl;
 
    /* Recupera ambiente do cplex */
   IloEnv env = getEnv();
 
   /* Pega a solução do LP. */
-  IloNumArray val(env);
-  getValues(val, x);
+  IloNumArray valx(env);
+  IloNumArray valy(env);
+  IloNumArray valz(env);
+  getValues(valx, x);
+  getValues(valy, x);
+  getValues(valz, x);
+
+  for (int i = 0; i < v_; i++) {
+    vector<int> arestas;
+    for (int j = 0; g[i].size(); i++) {
+      int to = g[i][j];
+      if (valz[edge_to_index[{i, to}]] > 1 - EPSILON) {
+        arestas.push_back(edge_to_index[{i, to}]);
+      }
+    }
+    if (arestas.size() >= 2 && valy[i] < 1 - EPSILON) {
+      IloExpr cut(env);
+      for (int aresta : arestas) {
+        cut += z[aresta];
+      }
+      int rhs = arestas.size() - 1;
+      add(cut - 1 <= rhs * y[i]);
+      contador_d34++;
+    }
+  }
 
   vector<int> r(v_);
   vector<int> p(v_);
@@ -92,15 +115,11 @@ ILOUSERCUTCALLBACK1(CortesHybrid, IloBoolVarArray, x) {
     for (int j = 0; j < a_; j++) {
       /* Somar arestas ligando os dois vertices resultantes */
       if (findSet(origem[j], r, p) != findSet(destino[j], r, p))
-        cut += val[j];
+        cut += valx[j];
     }
 
     /* Adicionando corte */
     if (cut < 1) {
-      cout << "Cut pequeno encontrado na iteraçao: " << i << " cut: " << cut << endl;
-      for (int j = 0; j < v_; j++) {
-        cout << j << ": " << findSet(j, r, p) << endl;
-      }
       IloExpr cut(env);
       for (int j = 0; j < a_; j++) {
         if (findSet(origem[j], r, p) != findSet(destino[j], r, p)) {
@@ -108,6 +127,7 @@ ILOUSERCUTCALLBACK1(CortesHybrid, IloBoolVarArray, x) {
         }
       }
       add(cut >= 1);
+      contador_sec++;
       break;
     }
   }
@@ -152,6 +172,7 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraintsHybrid, IloBoolVarArray, x) {
     }
     double rhs = components[i].size() - 1.0;
     add(cut <= rhs);
+    contador_sec++;
   }
 }
 

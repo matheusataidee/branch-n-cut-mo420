@@ -383,7 +383,7 @@ int main(int argc, char * argv[]) {
 
     if(use_primal_heur) cplex.use(HeuristicaPrimalHybrid(env, x, y, z));
     cplex.use(LazyConstraintsHybrid(env, x));
-    cplex.use(CortesHybrid(env, x));
+    cplex.use(CortesHybrid(env, x, y, z));
 
     if(cplex.solve()){
 
