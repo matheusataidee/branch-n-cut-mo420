@@ -139,7 +139,9 @@ void imprime_solucao(ModelType model_type, int timelimit, int use_primal_heur, s
 /*	escrita do arquivo .sol */
 	ofstream file_sol(input_path + ".sol");
 
-	if(!model_type) file_sol << "s " << timelimit << " " << use_primal_heur << " " << input_path << endl;
+  string model_s = (model_type == ILP) ? "s" : "h";
+  string use_heur_s = use_primal_heur ? "1" : "0";
+	file_sol << model_s << " " << timelimit << " " << use_heur_s << " " << input_path << endl;
 
 	for(int value = 0; value < a_; value++) 
 		if(xstar[value] == 1) file_sol << origem[value] << " " << destino[value] << endl;
@@ -149,7 +151,7 @@ void imprime_solucao(ModelType model_type, int timelimit, int use_primal_heur, s
 /*	escrita do arquivo .est */
 	ofstream file(input_path + ".est");
 
-	if(!model_type) file << "s " << timelimit << " " << use_primal_heur << " " << input_path << endl;
+	file << model_s << " " << timelimit << " " << use_heur_s << " " << input_path << endl;
 	file << contador_sec << endl; /* int */
 	file << contador_d18 << endl; /* int */
 	file << contador_d19 << endl; /* int */
@@ -179,7 +181,9 @@ void imprime_solucao(ModelType model_type, int timelimit, int use_primal_heur, s
 /*	escrita do arquivo .sol */
 	ofstream file_sol(input_path + ".sol");
 
-	if(!model_type) file_sol << "s " << timelimit << " " << use_primal_heur << " " << input_path << endl;
+	string model_s = (model_type == ILP) ? "s" : "h";
+  string use_heur_s = use_primal_heur ? "1" : "0";
+	file_sol << model_s << " " << timelimit << " " << use_heur_s << " " << input_path << endl;
 
 	for(int value = 0; value < (v_ - 1); value++) 
 		file_sol << -1 << " " << -1 << endl;
@@ -189,7 +193,7 @@ void imprime_solucao(ModelType model_type, int timelimit, int use_primal_heur, s
 /*	escrita do arquivo .est */
 	ofstream file(input_path + ".est");
 
-	if(!model_type) file << "s " << timelimit << " " << use_primal_heur << " " << input_path << endl;
+	file << model_s << " " << timelimit << " " << use_heur_s << " " << input_path << endl;
 	file << contador_sec << endl; /* int */
 	file << contador_d18 << endl; /* int */
 	file << contador_d19 << endl; /* int */
