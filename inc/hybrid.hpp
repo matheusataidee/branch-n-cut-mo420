@@ -81,6 +81,7 @@ ILOUSERCUTCALLBACK3(CortesHybrid, IloBoolVarArray, x, IloBoolVarArray, y, IloBoo
   getValues(valy, y);
   getValues(valz, z);
 
+  /* Constraints (18) */
   for (int i = 0; i < v_; i++) {
     vector<int> arestas;
     for (int j = 0; j < g[i].size(); j++) {
@@ -100,6 +101,58 @@ ILOUSERCUTCALLBACK3(CortesHybrid, IloBoolVarArray, x, IloBoolVarArray, y, IloBoo
     }
   }
 
+  /* Constraints (19) */
+  vector<set<int> > components;
+  vector<int> used(v_, false);
+  for (int i = 0; i < v_; i++) {
+    if (!used[i]) {
+      set<int> comp;
+      queue<int> myq;
+      myq.push(i);
+      while (!myq.empty()) {
+        int p = myq.front();  myq.pop();
+        comp.insert(p);
+        for (int i = 0; i < g[p].size(); i++) {
+          int to = g[p][i];
+          if (!used[to] && valx[edge_to_index[{p, to}] / 2] > 1 - EPSILON) {
+            used[to] = true;
+            myq.push(to);
+          }
+        }
+      }
+      components.push_back(comp);
+    }
+  }
+  if (components.size() == 2) {
+    for (int i = 0; i < components.size(); i++) {
+      for (int v_corte : vertices_corte) {
+        bool condition = false;
+        if (components[i].count(v_corte) && valy[v_corte] < 1 - EPSILON) {
+          for (int j = 0; j < g[v_corte].size(); j++) {
+            int to = g[v_corte][j];
+            if (components[1 - i].count(to)) condition = true;
+          }
+        }
+        if (!condition) continue;
+        for (int j1 = 0; j1 < g[v_corte].size(); j1++) {
+          int v1 = g[v_corte][j1];
+          for (int j2 = j1 + 1; j2 < g[v_corte].size(); j2++) {
+            int v2 = g[v_corte][j2];
+            if (!components[i].count(v1) || !components[i].count(v2)) continue;
+            if (valx[edge_to_index[{v_corte, v1}] / 2] < 1 - EPSILON) continue;
+            if (valx[edge_to_index[{v_corte, v2}] / 2] < 1 - EPSILON) continue;
+            IloExpr cut(env);
+            cut += x[edge_to_index[{v_corte, v1}] / 2];
+            cut += x[edge_to_index[{v_corte, v2}] / 2];
+            contador_d19++;
+            add(cut <= y[v_corte] + 1);
+          }
+        }
+      }
+    }
+  }
+
+  /* Constraints (34) */
   for (int i = 0; i < v_; i++) {
     vector<int> arestas;
     for (int j = 0; j < g[i].size(); j++) {
@@ -119,6 +172,7 @@ ILOUSERCUTCALLBACK3(CortesHybrid, IloBoolVarArray, x, IloBoolVarArray, y, IloBoo
     }
   }
 
+  /* SEC constraints fracionais */
   vector<int> r(v_);
   vector<int> p(v_);
   for (int i = 0; i < 1000; i++) {
