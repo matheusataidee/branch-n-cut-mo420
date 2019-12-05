@@ -26,6 +26,8 @@ int tempo_global;
 vector<bool> visitado;
 vector<int> tempo_entrada; /* Tempo que a árvore DFS chega em v */
 vector<int> menor_retorno; /* Menor tempo de entrada que v alcança na árvore DFS */
+vector<vector<int>> ciclos_tam_3; /* ciclos de tamanho 3 */
+vector<vector<int>> ciclos_arestas; /* ciclos de tamanho 3 */
 
 // void pre_processamento();
 // void dfs_cortes(int v, int pai = -1);
@@ -68,6 +70,90 @@ struct RegAux {
 	}
 };
 
+void caminhos_tam_3(int v, int inicio, int tam, vector<int> &cam) {
+
+    visitado[v] = true;
+
+    // Último vértice do caminho
+    if (tam == 0) {
+
+        visitado[v] = false;
+
+        // Verificar se encontrou ciclo
+        bool inicio_adj = find(listaAdj[v].begin(), listaAdj[v].end(), inicio) != listaAdj[v].end();
+
+        if (inicio_adj && cam.size() == 2) {
+
+            cam.push_back(inicio);
+            sort(cam.begin(), cam.end());
+
+            bool repetido;
+
+            for (vector<int> c : ciclos_tam_3) 
+                if (cam == c) repetido = true;
+            
+            if (!repetido)
+                ciclos_tam_3.push_back(cam);
+
+        }
+
+        cam.clear();
+
+    } else {
+
+        // Buscar por profundidade todo caminho de tamanho 3 possível
+        for (int i = 0; i < v_; i++) {
+
+            bool eh_adj = find(listaAdj[v].begin(), listaAdj[v].end(), i) != listaAdj[v].end();
+
+            if (!visitado[i] && eh_adj) {
+                cam.push_back(i);
+                caminhos_tam_3(i, inicio, tam - 1, cam);
+            }
+
+        }
+
+        visitado[v] = false;
+
+    }
+
+}
+
+vector<int> ciclo_arestas(vector<int> v_ciclo) {
+
+    int v1 = v_ciclo[0], v2 = v_ciclo[1], v3 = v_ciclo[2];
+    vector<int> a_ciclo;
+
+    for (int i = 0; i < 3; i++) {
+        for (int e = 0; e < a_; e++) {
+
+            int orig = origem[e], dest = destino[e];
+            int next;
+            
+            (i == 2 ? next = 0 : next = i + 1);
+
+            if ((v_ciclo[i] == orig && v_ciclo[next] == dest) || (v_ciclo[i] == dest && v_ciclo[next] == orig)) {
+                a_ciclo.push_back(e);
+            }
+
+        }
+    }
+
+    return a_ciclo;
+}
+
+void encontrar_ciclos() {
+
+    visitado.assign(v_, false);
+
+    for (int i = 0; i < v_ - 2 ; i++) {
+        vector<int> cam_vazio;
+        caminhos_tam_3(i,i,2,cam_vazio);
+        visitado[i] = true;
+    }
+
+}
+
 void dfs(int v, vector<vector<int>> lista_adj){
 
 	if (!visitado[v]) {
@@ -98,7 +184,7 @@ void imprime_solucao(ModelType model_type, int timelimit, int use_primal_heur, s
 	if(!model_type) file_sol << "s " << timelimit << " " << use_primal_heur << " " << input_path << endl;
 
 	for(int value = 0; value < a_; value++) 
-		if(xstar[value] == 1) file_sol << origem[value] << " " << destino[value] << endl;
+		if(xstar[value] > 0 + EPSILON) file_sol << origem[value] << " " << destino[value] << endl;
 
 	file_sol.close();
 
@@ -274,6 +360,40 @@ ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 	IloNumArray y_val(env);
 	getValues(y_val, *y_global);
 
+	vector<int> r(v_);
+	vector<int> p(v_);
+
+	for(int i = 0; i < 1000; i++){
+
+		for (int j = 0; j < v_; j++) makeSet(j, r, p);
+		int n_componentes = v_;
+
+/*		Contracao de arestas ate so restar dois vertices */
+		while(n_componentes > 2){
+			int aresta = rand() % a_;
+			n_componentes -= uniteSets(origem[aresta], destino[aresta], r, p);
+		}
+
+		double cut = 0;
+		for(int j = 0; j < a_; j++){
+/* 			somar arestas ligando os dois vertices resultantes */
+			if(findSet(origem[j], r, p) != findSet(destino[j], r, p))
+				cut += val[j];
+		}
+
+/* 		adicionando corte */
+		if(cut < 1 - EPSILON){
+			IloExpr cut(env);
+			for(int j = 0; j < a_; j++)
+				if(findSet(origem[j], r, p) != findSet(destino[j], r, p))
+					cut += x[j];
+
+			add(cut >= 1);
+			contador_sec++;
+			break;
+		}
+	}
+
 /*	cria os cortes representados pelas desigualdades validas do tipo (18) */
 	for(int i = 0; i < v_; i++){
 		vector<int> arestas;
@@ -314,7 +434,7 @@ ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 			for(int k : row){
 				for(int e = 0; e < a_; e++){
 
-					if(k == origem[e] && val[e] == 1 && inserted[destino[e]] == 0){
+					if(k == origem[e] && val[e] > 1 - EPSILON && inserted[destino[e]] == 0){
 /*						cout << "["<< origem[e] << "," << destino[e] << "]" << endl; */
 						row.push_back(destino[e]);
 						inserted[destino[e]] = 1;
@@ -322,7 +442,7 @@ ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 						novo = 0;
 					}
 
-					if(k == destino[e] && val[e] == 1 && inserted[origem[e]] == 0){
+					if(k == destino[e] && val[e] > 1 - EPSILON && inserted[origem[e]] == 0){
 /*						cout << "[" << origem[e] << "," << destino[e] << "]" << endl; */
 						row.push_back(origem[e]);
 						inserted[origem[e]] = 1;
@@ -350,7 +470,7 @@ ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 			position++;
 			if(component.size() > 2){
 				for(int cut_vertex : vertices_corte){
-					if(std::find(component.begin(), component.end(), cut_vertex) != component.end() && y_val[cut_vertex] < 1){
+					if(std::find(component.begin(), component.end(), cut_vertex) != component.end() && y_val[cut_vertex] < 1 - EPSILON){
 
 						int index;
 						if(position == 0)
@@ -408,6 +528,33 @@ ILOUSERCUTCALLBACK1(Cortes, IloBoolVarArray, x) {
 		}
 	}
 
+/*  cria uma restrição tipo mochila (para cada componente) para suprimir subciclos nas componentes encontradas */
+	for(const std::vector<int> &component : components){
+
+		if(component.size() < v_){
+
+/*			for(int value : component) std::cout << value << ' ';
+			std::cout << std::endl; */
+
+			IloExpr cut(env);
+			int arestas_na_solucao = 0;
+			for(int e = 0; e < a_; e++){
+
+				if(std::find(component.begin(), component.end(), origem[e]) != component.end() && std::find(component.begin(), component.end(), destino[e]) != component.end()){
+					cut += x[e];
+					if(val[e] > EPSILON) arestas_na_solucao++;
+				}
+			}
+
+			double rhs = double(component.size() - 1.0);
+			if(arestas_na_solucao > rhs){
+//				cout << cut << " <= " << rhs << endl;
+				add(cut <= rhs);
+				contador_sec++;
+			}
+		}
+	}
+
 }
 
 ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
@@ -441,7 +588,7 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
 		}
 
 /* 		adicionando corte */
-		if(cut < 1){
+		if(cut < 1 - EPSILON){
 			IloExpr cut(env);
 			for(int j = 0; j < a_; j++)
 				if(findSet(origem[j], r, p) != findSet(destino[j], r, p))
@@ -450,6 +597,100 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
 			add(cut >= 1);
 			contador_sec++;
 			break;
+		}
+	}
+
+	IloNumArray y_val(env);
+	getValues(y_val, *y_global);
+
+	vector<vector<int>> components;
+	vector<int> inserted(v_, 0);
+	int alocado = 0;
+	int novo;
+
+	vector<int> row;
+
+/*  avalia se o grafo retornado tem mais de uma componente e, se sim, separa essas componentes */
+	do{
+
+		if(row.size() == 0){
+
+/*			cout << "component novo criado" << endl; */
+
+			for(int k = 0; k < v_; k++){
+
+				if(inserted[k] == 0){
+					row.push_back(k);
+					inserted[k] = 1;
+					alocado++;
+					break;
+				}
+			}
+		}else{
+
+			novo = 1;
+
+			for(int k : row){
+				for(int e = 0; e < a_; e++){
+
+					if(k == origem[e] && val[e] > 1 - EPSILON && inserted[destino[e]] == 0){
+/*						cout << "["<< origem[e] << "," << destino[e] << "]" << endl; */
+						row.push_back(destino[e]);
+						inserted[destino[e]] = 1;
+						alocado++;
+						novo = 0;
+					}
+
+					if(k == destino[e] && val[e] > 1 - EPSILON && inserted[origem[e]] == 0){
+/*						cout << "[" << origem[e] << "," << destino[e] << "]" << endl; */
+						row.push_back(origem[e]);
+						inserted[origem[e]] = 1;
+						alocado++;
+						novo = 0;
+					}
+				}
+			}
+
+			if(novo){
+				components.push_back(row);
+				row.clear();
+			}
+		}
+
+	}while(alocado < v_);
+
+	components.push_back(row);
+/*
+	for(vector<int> comp : components){
+		for(int k : comp) cout << k << " ";
+		cout << endl;
+	}
+	cout << endl; // */
+
+/*  cria uma restrição tipo mochila (para cada componente) para suprimir subciclos nas componentes encontradas */
+	for(const std::vector<int> &component : components){
+
+		if(component.size() < v_){
+
+/*			for(int value : component) std::cout << value << ' ';
+			std::cout << std::endl; */
+
+			IloExpr cut(env);
+			int arestas_na_solucao = 0;
+			for(int e = 0; e < a_; e++){
+
+				if(std::find(component.begin(), component.end(), origem[e]) != component.end() && std::find(component.begin(), component.end(), destino[e]) != component.end()){
+					cut += x[e];
+					if(val[e] > EPSILON) arestas_na_solucao++;
+				}
+			}
+
+			double rhs = double(component.size() - 1.0);
+			if(arestas_na_solucao > rhs){
+//				cout << cut << " <= " << rhs << endl;
+				add(cut <= rhs);
+				contador_sec++;
+			}
 		}
 	}
 
@@ -584,6 +825,14 @@ int main(int argc, char * argv[]) {
 	file.close();
 
     pre_processamento();
+	encontrar_ciclos();
+
+	for(vector<int> v_ciclos : ciclos_tam_3){
+		vector<int> a_ciclos = ciclo_arestas(v_ciclos);
+		ciclos_arestas.push_back(a_ciclos);
+		for(int k : a_ciclos) cout << k << " ";
+	}
+	cout << endl; // */
 
 //	for(int value : arestas_ponte) cout << "aresta ponte: " << value + 14 << " - (" << origem[value] << ", " << destino[value] << ")" << endl;
 //	for(int value : vertices_corte) cout << "vertices corte: " << value << endl;
@@ -636,7 +885,7 @@ int main(int argc, char * argv[]) {
 	cplex.extract(model);
 
 /*  silencia o cplex no terminal */
-//	cplex.setOut(env.getNullStream());
+	cplex.setOut(env.getNullStream());
 
 /*  atribui valores aos diferentes parametros de controle do CPLEX */
 	cplex.setParam(IloCplex::Param::TimeLimit, timelimit);
@@ -656,7 +905,7 @@ int main(int argc, char * argv[]) {
 	cplex.use(LazyConstraints(env, x_temp));
 	cplex.use(Cortes(env, x_temp));
 
-	bool achou_solucao;
+	int achou_solucao = 0;
 
 	if(cplex.solve()){
 
