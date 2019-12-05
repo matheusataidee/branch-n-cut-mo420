@@ -14,6 +14,8 @@ extern int tempo_global;
 extern vector<bool> visitado;
 extern vector<int> tempo_entrada; /* Tempo que a árvore DFS chega em v */
 extern vector<int> menor_retorno; /* Menor tempo de entrada que v alcança na árvore DFS */
+extern vector<vector<int>> ciclos_tam_3; /* ciclos de tamanho 3 */
+extern vector<vector<int>> ciclos_arestas; /* ciclos de tamanho 3 */
 
 /* ---- conjunto de variaveis ainda nao utilizadas devidamente (estavam no exemplo) ---- */
 	
@@ -112,6 +114,90 @@ int testOk(IloNumArray& xstar, IloNumArray& ystar, IloNumArray& zstar) {
   return 0;
 }
 
+void caminhos_tam_3(int v, int inicio, int tam, vector<int> &cam) {
+
+    visitado[v] = true;
+
+    // Último vértice do caminho
+    if (tam == 0) {
+
+        visitado[v] = false;
+
+        // Verificar se encontrou ciclo
+        bool inicio_adj = find(listaAdj[v].begin(), listaAdj[v].end(), inicio) != listaAdj[v].end();
+
+        if (inicio_adj && cam.size() == 2) {
+
+            cam.push_back(inicio);
+            sort(cam.begin(), cam.end());
+
+            bool repetido;
+
+            for (vector<int> c : ciclos_tam_3) 
+                if (cam == c) repetido = true;
+            
+            if (!repetido)
+                ciclos_tam_3.push_back(cam);
+
+        }
+
+        cam.clear();
+
+    } else {
+
+        // Buscar por profundidade todo caminho de tamanho 3 possível
+        for (int i = 0; i < v_; i++) {
+
+            bool eh_adj = find(listaAdj[v].begin(), listaAdj[v].end(), i) != listaAdj[v].end();
+
+            if (!visitado[i] && eh_adj) {
+                cam.push_back(i);
+                caminhos_tam_3(i, inicio, tam - 1, cam);
+            }
+
+        }
+
+        visitado[v] = false;
+
+    }
+
+}
+
+vector<int> ciclo_arestas(vector<int> v_ciclo) {
+
+    int v1 = v_ciclo[0], v2 = v_ciclo[1], v3 = v_ciclo[2];
+    vector<int> a_ciclo;
+
+    for (int i = 0; i < 3; i++) {
+        for (int e = 0; e < a_; e++) {
+
+            int orig = origem[e], dest = destino[e];
+            int next;
+            
+            (i == 2 ? next = 0 : next = i + 1);
+
+            if ((v_ciclo[i] == orig && v_ciclo[next] == dest) || (v_ciclo[i] == dest && v_ciclo[next] == orig)) {
+                a_ciclo.push_back(e);
+            }
+
+        }
+    }
+
+    return a_ciclo;
+}
+
+void encontrar_ciclos() {
+
+    visitado.assign(v_, false);
+
+    for (int i = 0; i < v_ - 2 ; i++) {
+        vector<int> cam_vazio;
+        caminhos_tam_3(i,i,2,cam_vazio);
+        visitado[i] = true;
+    }
+
+}
+
 void dfs(int v, vector<vector<int>> lista_adj){
 
 	if (!visitado[v]) {
@@ -144,7 +230,7 @@ void imprime_solucao(ModelType model_type, int timelimit, int use_primal_heur, s
 	file_sol << model_s << " " << timelimit << " " << use_heur_s << " " << input_path << endl;
 
 	for(int value = 0; value < a_; value++) 
-		if(xstar[value] > 1 - EPSILON) file_sol << origem[value] << " " << destino[value] << endl;
+		if(xstar[value] > 0 + EPSILON) file_sol << origem[value] << " " << destino[value] << endl;
 
 	file_sol.close();
 

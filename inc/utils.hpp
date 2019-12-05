@@ -20,6 +20,9 @@ int uniteSets (int a, int b, vector<int>& r, vector<int>& p);
 // Retorna 0 quando solução é coerente, e um codigo quando nao coerente
 int testOk(IloNumArray& xstar, IloNumArray& ystar, IloNumArray& zstar);
 
+void caminhos_tam_3(int v, int inicio, int tam, vector<int> &cam);
+vector<int> ciclo_arestas(vector<int> v_ciclo);
+void encontrar_ciclos();
 void dfs(int v, vector<vector<int>> lista_adj);
 bool is_connected(vector<vector<int>> lista_adj);
 void imprime_solucao(ModelType model_type, int timelimit, int use_primal_heur, string input_path, IloNumArray xstar, double diff_time);

@@ -39,6 +39,8 @@ int tempo_global;
 vector<bool> visitado;
 vector<int> tempo_entrada; /* Tempo que a árvore DFS chega em v */
 vector<int> menor_retorno; /* Menor tempo de entrada que v alcança na árvore DFS */
+vector<vector<int>> ciclos_tam_3; /* ciclos de tamanho 3 */
+vector<vector<int>> ciclos_arestas; /* ciclos de tamanho 3 */
 
 // void pre_processamento();
 // void dfs_cortes(int v, int pai = -1);
