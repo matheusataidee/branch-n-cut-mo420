@@ -113,7 +113,7 @@ int main(int argc, char * argv[]) {
 
     /*  le dados de entrada do problema */
     //	scanf("%d %d", &v_, &a_);
-      file >> v_ >> a_ >> descarta;
+      file >> v_ >> a_;
       v.resize(v_);
       origem.resize(a_);
       destino.resize(a_);
@@ -129,7 +129,7 @@ int main(int argc, char * argv[]) {
       int orig, dest;
       for(int i = 0; i < a_; i++){
     //		scanf("%d %d", &orig, &dest);
-        file >> orig >> dest >> descarta;
+        file >> orig >> dest;
 
         origem[i] = orig - 1;
         destino[i] = dest - 1;
@@ -141,6 +141,14 @@ int main(int argc, char * argv[]) {
       file.close();
 
         pre_processamento();
+      encontrar_ciclos();
+
+      for(vector<int> v_ciclos : ciclos_tam_3){
+        vector<int> a_ciclos = ciclo_arestas(v_ciclos);
+        ciclos_arestas.push_back(a_ciclos);
+        for(int k : a_ciclos) cout << k << " ";
+      }
+      cout << endl; // */
 
     //	for(int value : arestas_ponte) cout << "aresta ponte: " << value + 14 << " - (" << origem[value] << ", " << destino[value] << ")" << endl;
     //	for(int value : vertices_corte) cout << "vertices corte: " << value << endl;
@@ -193,7 +201,7 @@ int main(int argc, char * argv[]) {
       cplex.extract(model);
 
     /*  silencia o cplex no terminal */
-    //	cplex.setOut(env.getNullStream());
+      cplex.setOut(env.getNullStream());
 
     /*  atribui valores aos diferentes parametros de controle do CPLEX */
       cplex.setParam(IloCplex::Param::TimeLimit, timelimit);
@@ -213,7 +221,7 @@ int main(int argc, char * argv[]) {
       cplex.use(LazyConstraintsILP(env, x_temp));
       cplex.use(CortesILP(env, x_temp));
 
-      bool achou_solucao;
+      int achou_solucao = 0;
 
       if(cplex.solve()){
 
@@ -240,6 +248,9 @@ int main(int argc, char * argv[]) {
 
         chrono::high_resolution_clock::time_point now = chrono::high_resolution_clock::now();
         chrono::duration<double> diff_time = chrono::duration_cast<chrono::duration<double>>(now - start);
+
+        cout << "Limitante dual: " << melhor_limitante_dual << endl;
+        cout << "Primal: " << zstar << endl;
 
         imprime_solucao(model_type, timelimit, use_primal_heur, input_path, xstar, diff_time.count());
 
