@@ -381,37 +381,46 @@ int main(int argc, char * argv[]) {
     cplex.exportModel("LP.lp");
 
 
-    cplex.use(HeuristicaPrimal(env, x, y, z));
-    cplex.use(LazyConstraints(env, x));
-    cplex.use(CorteMinimo(env, x));
+    if(use_primal_heur) cplex.use(HeuristicaPrimalHybrid(env, x, y, z));
+    cplex.use(LazyConstraintsHybrid(env, x));
+    cplex.use(CortesHybrid(env, x));
 
-    cplex.solve();
+    if(cplex.solve()){
 
-    cout << "solucao otima: " << cplex.getObjValue() << endl;
+        incumbent_node = cplex.getIncumbentNode();
+        zstar = cplex.getObjValue();
+        melhor_limitante_dual = cplex.getBestObjValue();
+        total_no_exp = cplex.getNnodes();
 
-    IloNumArray ystar(env);
-    cplex.getValues(ystar, y);
-    cout << "valores de y:" << endl;
-    for(int i = 0; i < v_; i++){
-      cout << "y[" << i << "]: " << ystar[i] << endl;
+        IloNumArray ystar(env);
+        IloNumArray xstar(env);
+        IloNumArray zstar_resp(env);
+        cplex.getValues(ystar, y);
+        cplex.getValues(xstar, x);
+        cplex.getValues(zstar_resp, z);
+
+        chrono::high_resolution_clock::time_point now = chrono::high_resolution_clock::now();
+        chrono::duration<double> diff_time = chrono::duration_cast<chrono::duration<double>>(now - start);
+
+        imprime_solucao(model_type, timelimit, use_primal_heur, input_path, xstar, diff_time.count());
+
+        cout << "test return code: " << testOk(xstar, ystar, zstar_resp) << endl;
+
+    } else {
+        printf("Main: programa terminou sem achar solucao inteira !\n");
+
+        incumbent_node = -1;
+        zstar = -1;
+        melhor_limitante_dual = cplex.getBestObjValue();
+        total_no_exp = cplex.getNnodes();
+
+        chrono::high_resolution_clock::time_point now = chrono::high_resolution_clock::now();
+        chrono::duration<double> diff_time = chrono::duration_cast<chrono::duration<double>>(now - start);
+
+        
+        imprime_solucao(model_type, timelimit, use_primal_heur, input_path, diff_time.count());
     }
 
-    IloNumArray xstar(env);
-    cplex.getValues(xstar, x);
-    cout << "valores de x:" << endl;
-    for(int i = 0; i < a_; i++){
-      cout << "x[" << origem[i] << "," << destino[i] << "]: " << xstar[i] << endl;
-    }
-
-    IloNumArray zstar(env);
-    cplex.getValues(zstar, z);
-    cout << "valores de z:" << endl;
-    for (int i = 0; i < a_; i++) {
-      cout << "(" << origem[i] << ", " << destino[i] << ") " << zstar[2 * i] << endl;
-      cout << "(" << destino[i] << ", " << origem[i] << ") " << zstar[2 * i + 1] << endl;
-    }
-
-    cout << "test return code: " << testOk(xstar, ystar, zstar) << endl;
   }
 
   return 0;

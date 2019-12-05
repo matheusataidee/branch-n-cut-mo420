@@ -67,7 +67,7 @@ extern IloBoolVarArray* x_global;
       cada um dos dois vertices resultantes
     - Verifica se essa soma de pesos eh menor que um
     - Caso seja, o corte eh adicionado*/
-ILOUSERCUTCALLBACK1(CorteMinimo, IloBoolVarArray, x) {
+ILOUSERCUTCALLBACK1(CortesHybrid, IloBoolVarArray, x) {
   cout << "Entrei no callback" << endl;
 
    /* Recupera ambiente do cplex */
@@ -113,7 +113,7 @@ ILOUSERCUTCALLBACK1(CorteMinimo, IloBoolVarArray, x) {
   }
 }
 
-ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
+ILOLAZYCONSTRAINTCALLBACK1(LazyConstraintsHybrid, IloBoolVarArray, x) {
   cout << "Entrou no Lazy constraints" << endl;
   /* Recupera ambiente do cplex */
   IloEnv env = getEnv();
@@ -155,7 +155,7 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraints, IloBoolVarArray, x) {
   }
 }
 
-ILOHEURISTICCALLBACK3(HeuristicaPrimal, IloBoolVarArray, x, IloBoolVarArray, y, IloBoolVarArray,  z) {
+ILOHEURISTICCALLBACK3(HeuristicaPrimalHybrid, IloBoolVarArray, x, IloBoolVarArray, y, IloBoolVarArray,  z) {
   cout << "heuristica primal executada!" << endl;
   IloNumArray val_x(getEnv());
   IloNumArray val_y(getEnv());
