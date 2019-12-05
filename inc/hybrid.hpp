@@ -184,15 +184,15 @@ ILOUSERCUTCALLBACK3(CortesHybrid, IloBoolVarArray, x, IloBoolVarArray, y, IloBoo
       n_componentes -= uniteSets(origem[aresta], destino[aresta], r, p);
     }
 
-    double cut = 0;
+    double cut_sum = 0.0;
     for (int j = 0; j < a_; j++) {
       /* Somar arestas ligando os dois vertices resultantes */
       if (findSet(origem[j], r, p) != findSet(destino[j], r, p))
-        cut += valx[j];
+        cut_sum += valx[j];
     }
 
     /* Adicionando corte */
-    if (cut < 1) {
+    if (cut_sum < 1.0) {
       IloExpr cut(env);
       for (int j = 0; j < a_; j++) {
         if (findSet(origem[j], r, p) != findSet(destino[j], r, p)) {
@@ -228,7 +228,7 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraintsHybrid, IloBoolVarArray, x) {
         comp.insert(p);
         for (int i = 0; i < g[p].size(); i++) {
           int to = g[p][i];
-          if (!used[to] && val[edge_to_index[{p, to}] / 2] == 1) {
+          if (!used[to] && val[edge_to_index[{p, to}] / 2] > 1 - EPSILON) {
             used[to] = true;
             myq.push(to);
           }

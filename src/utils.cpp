@@ -144,7 +144,7 @@ void imprime_solucao(ModelType model_type, int timelimit, int use_primal_heur, s
 	file_sol << model_s << " " << timelimit << " " << use_heur_s << " " << input_path << endl;
 
 	for(int value = 0; value < a_; value++) 
-		if(xstar[value] == 1) file_sol << origem[value] << " " << destino[value] << endl;
+		if(xstar[value] > 1 - EPSILON) file_sol << origem[value] << " " << destino[value] << endl;
 
 	file_sol.close();
 

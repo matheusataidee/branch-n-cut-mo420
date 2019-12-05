@@ -364,6 +364,17 @@ int main(int argc, char * argv[]) {
       model.add(constr_35 == x[i]);
     }
 
+    /* restricao (7) */
+    for (int i = 0; i < v_; i++) {
+      IloExpr constr_7(env);
+      for (int j = 0; j < g[i].size(); j++) {
+        int to = g[i][j];
+        constr_7 += x[edge_to_index[{i, to}] / 2];
+      }
+      model.add(constr_7 - 1 >= 2 * y[i]);
+    }
+
+    /* restricao de pontes */
     for (int ponte : arestas_ponte) {
       IloExpr constr_ponte(env);
       constr_ponte += x[ponte];
