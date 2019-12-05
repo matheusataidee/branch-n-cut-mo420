@@ -271,15 +271,20 @@ int main(int argc, char * argv[]) {
     v.resize(v_);
     origem.resize(a_);
     destino.resize(a_);
+    listaAdj.resize(v_);
 
     for (int i = 0; i < a_; i++) {
       fin >> origem[i] >> destino[i];
       origem[i]--;  destino[i]--; // Tornando a indexação 0-based
       g[origem[i]].push_back(destino[i]);
       g[destino[i]].push_back(origem[i]);
+      listaAdj[origem[i]].push_back(destino[i]);
+      listaAdj[destino[i]].push_back(origem[i]);
       edge_to_index[{origem[i], destino[i]}] = 2 * i;
       edge_to_index[{destino[i], origem[i]}] = 2 * i + 1;
     }
+
+    pre_processamento();
 
     /* objeto que representa o modelo */
     IloModel model(env);
@@ -352,12 +357,17 @@ int main(int argc, char * argv[]) {
     model.add(constr_29 - 2 <= ((int)g[root].size() - 2) * y[root]);
 
     /* restricao (35) */
-    IloExpr constr_35(env);
     for (int i = 0; i < a_; i++) {
       IloExpr constr_35(env);
       constr_35 += z[2 * i];
       constr_35 += z[2 * i + 1];
       model.add(constr_35 == x[i]);
+    }
+
+    for (int ponte : arestas_ponte) {
+      IloExpr constr_ponte(env);
+      constr_ponte += x[ponte];
+      model.add(constr_ponte == 1);
     }
 
     /* cria objeto do cplex */
@@ -404,6 +414,8 @@ int main(int argc, char * argv[]) {
 
         imprime_solucao(model_type, timelimit, use_primal_heur, input_path, xstar, diff_time.count());
 
+        cout << "Limitante dual: " << melhor_limitante_dual << endl;
+        cout << "Primal: " << zstar << endl;
         cout << "test return code: " << testOk(xstar, ystar, zstar_resp) << endl;
 
     } else {
