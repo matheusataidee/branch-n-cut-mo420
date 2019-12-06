@@ -324,16 +324,13 @@ void dfs_cortes(int v, int pai = -1){
 			/* Se o vértice dest adjacente à v não alcançar outro cuja entrada na árvore DFS precede ou equivale a de v, a aresta (v, dest) é uma ponte e v um vértice de corte. */
 			if(menor_retorno[dest] > tempo_entrada[v]){
 
-//				cout << "Ponte (" << v << ", " << dest << ")" << endl;
 				for(int e = 0; e < a_; e++)
 					if(origem[e] == v && destino[e] == dest) arestas_ponte.push_back(e);
 				if(!(std::find(vertices_corte.begin(), vertices_corte.end(), v) != vertices_corte.end())) vertices_corte.push_back(v);
-//              cout << "Vértice de corte: " << v << endl;
 
 			/* Se dest alcançar v, a aresta (v, dest) não é uma ponte mas v é um vértice de corte. */
 			}else if(menor_retorno[dest] == tempo_entrada[v]){
 
-//              cout << "Vértice de corte: " << v << endl;
 				if(!(std::find(vertices_corte.begin(), vertices_corte.end(), v) != vertices_corte.end())) vertices_corte.push_back(v);
 
 			}

@@ -105,30 +105,21 @@ int main(int argc, char * argv[]) {
       totcuts = 0;   
       itersep = 0;
 
-    //	cout << "[Entrar com os dados da instancia: (copiar e colar todos os valores)]" << endl;
-
       ifstream file(input_path);
 
       int descarta;
 
     /*  le dados de entrada do problema */
-    //	scanf("%d %d", &v_, &a_);
       file >> v_ >> a_;
       v.resize(v_);
       origem.resize(a_);
       destino.resize(a_);
       listaAdj.resize(v_);
 
-    //	iota(v.begin(), v.end(), 0);
-
-    //	for(int i = 0; i < v_; i++) scanf("%d", &v[i]);
       for(int i = 0; i < v_; i++) v[i] = i;
-
-    //	for(int i = 0; i < a_; i++) scanf("%d %d", &origem[i], &destino[i]);
 
       int orig, dest;
       for(int i = 0; i < a_; i++){
-    //		scanf("%d %d", &orig, &dest);
         file >> orig >> dest;
 
         origem[i] = orig - 1;
@@ -149,9 +140,6 @@ int main(int argc, char * argv[]) {
         for(int k : a_ciclos) cout << k << " ";
       }
       cout << endl; // */
-
-    //	for(int value : arestas_ponte) cout << "aresta ponte: " << value + 14 << " - (" << origem[value] << ", " << destino[value] << ")" << endl;
-    //	for(int value : vertices_corte) cout << "vertices corte: " << value << endl;
 
       if(model_type) return -1;
 
@@ -192,8 +180,6 @@ int main(int argc, char * argv[]) {
         model.add(constr_4 - 2 - 7 * *y[i] <= 0); /* ajustar o valor 100 para d(v) */
       } 
 
-    //	for(int value : arestas_ponte) model.add(x_temp[value] == 1);
-
     /*  cria objeto do cplex */
       IloCplex cplex(env);
 
@@ -230,21 +216,11 @@ int main(int argc, char * argv[]) {
         melhor_limitante_dual = cplex.getBestObjValue();
         total_no_exp = cplex.getNnodes();
 
-      //	cout << "solucao otima: " << zstar << endl << endl;
-
         IloNumArray ystar(env);
         cplex.getValues(ystar, y_temp);
-      /*	cout << "valores de y:" << endl;
-        for(int i = 0; i < v_; i++){
-          if(ystar[i] > 0) cout << "\ty[" << i << "]: " << ystar[i] << endl;
-        } */
 
         IloNumArray xstar(env);
         cplex.getValues(xstar, x_temp);
-      /*	cout << endl << "valores de x:" << endl;
-        for(int i = 0; i < a_; i++){
-          if(xstar[i] > 0) cout << "\tx[" << origem[i] << "," << destino[i] << "]: " << xstar[i] << endl;
-        } */
 
         chrono::high_resolution_clock::time_point now = chrono::high_resolution_clock::now();
         chrono::duration<double> diff_time = chrono::duration_cast<chrono::duration<double>>(now - start);

@@ -34,8 +34,6 @@ extern vector<int> menor_retorno; /* Menor tempo de entrada que v alcança na á
 extern vector<vector<int>> ciclos_tam_3; /* ciclos de tamanho 3 */
 extern vector<vector<int>> ciclos_arestas; /* ciclos de tamanho 3 */
 
-// void pre_processamento();
-// void dfs_cortes(int v, int pai = -1);
 
 extern IloBoolVarArray* y_global;     
 extern IloBoolVarArray* x_global;     
@@ -61,8 +59,6 @@ extern IloBoolVarArray* x_global;
 	extern IloInt node_depth; /* profundidade do nó */
 
 ILOUSERCUTCALLBACK1(CortesILP, IloBoolVarArray, x) {
-
-/*	cout << "callback executado!" << endl; */
 
 	vector<vector<int>> components;
 	vector<int> inserted(v_, 0);
@@ -126,7 +122,6 @@ ILOUSERCUTCALLBACK1(CortesILP, IloBoolVarArray, x) {
 			IloExpr cut(env);
 			for(int value : arestas) cut += x[value];
 			double lhs = double(arestas.size() - 2);
-//			cout << cut << " - " << lhs << " * " << *y[i] << " <= " << 2 <<  endl; 
 			add(cut - lhs * *y[i] <= 2);
 			contador_d18++;
 		}
@@ -137,8 +132,6 @@ ILOUSERCUTCALLBACK1(CortesILP, IloBoolVarArray, x) {
 	do{
 
 		if(row.size() == 0){
-
-/*			cout << "component novo criado" << endl; */
 
 			for(int k = 0; k < v_; k++){
 
@@ -157,7 +150,6 @@ ILOUSERCUTCALLBACK1(CortesILP, IloBoolVarArray, x) {
 				for(int e = 0; e < a_; e++){
 
 					if(k == origem[e] && val[e] > 1 - EPSILON && inserted[destino[e]] == 0){
-/*						cout << "["<< origem[e] << "," << destino[e] << "]" << endl; */
 						row.push_back(destino[e]);
 						inserted[destino[e]] = 1;
 						alocado++;
@@ -165,7 +157,6 @@ ILOUSERCUTCALLBACK1(CortesILP, IloBoolVarArray, x) {
 					}
 
 					if(k == destino[e] && val[e] > 1 - EPSILON && inserted[origem[e]] == 0){
-/*						cout << "[" << origem[e] << "," << destino[e] << "]" << endl; */
 						row.push_back(origem[e]);
 						inserted[origem[e]] = 1;
 						alocado++;
@@ -238,8 +229,6 @@ ILOUSERCUTCALLBACK1(CortesILP, IloBoolVarArray, x) {
 								if(encontrado == 2 && y_val[cut_vertex] < 1 - EPSILON){
 										add(cut - *y[cut_vertex] - 1 <= 0);
 										contador_d19++;
-//										for(int z : component) cout << z << " ";
-//										cout << endl << "vertices: " << cut_vertex << ", (" << component[v1] << ", " << component[v2] << ")" << endl;
 									}
 								}
 							}
@@ -255,9 +244,6 @@ ILOUSERCUTCALLBACK1(CortesILP, IloBoolVarArray, x) {
 
 		if(component.size() < v_){
 
-/*			for(int value : component) std::cout << value << ' ';
-			std::cout << std::endl; */
-
 			IloExpr cut(env);
 			int arestas_na_solucao = 0;
 			for(int e = 0; e < a_; e++){
@@ -270,7 +256,6 @@ ILOUSERCUTCALLBACK1(CortesILP, IloBoolVarArray, x) {
 
 			double rhs = double(component.size() - 1.0);
 			if(arestas_na_solucao > rhs){
-//				cout << cut << " <= " << rhs << endl;
 				add(cut <= rhs);
 				contador_sec++;
 			}
@@ -337,8 +322,6 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraintsILP, IloBoolVarArray, x) {
 
 		if(row.size() == 0){
 
-/*			cout << "component novo criado" << endl; */
-
 			for(int k = 0; k < v_; k++){
 
 				if(inserted[k] == 0){
@@ -356,7 +339,6 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraintsILP, IloBoolVarArray, x) {
 				for(int e = 0; e < a_; e++){
 
 					if(k == origem[e] && val[e] > 1 - EPSILON && inserted[destino[e]] == 0){
-/*						cout << "["<< origem[e] << "," << destino[e] << "]" << endl; */
 						row.push_back(destino[e]);
 						inserted[destino[e]] = 1;
 						alocado++;
@@ -364,7 +346,6 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraintsILP, IloBoolVarArray, x) {
 					}
 
 					if(k == destino[e] && val[e] > 1 - EPSILON && inserted[origem[e]] == 0){
-/*						cout << "[" << origem[e] << "," << destino[e] << "]" << endl; */
 						row.push_back(origem[e]);
 						inserted[origem[e]] = 1;
 						alocado++;
@@ -382,20 +363,12 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraintsILP, IloBoolVarArray, x) {
 	}while(alocado < v_);
 
 	components.push_back(row);
-/*
-	for(vector<int> comp : components){
-		for(int k : comp) cout << k << " ";
-		cout << endl;
-	}
-	cout << endl; // */
 
 /*  cria uma restrição tipo mochila (para cada componente) para suprimir subciclos nas componentes encontradas */
 	for(const std::vector<int> &component : components){
 
 		if(component.size() < v_){
 
-/*			for(int value : component) std::cout << value << ' ';
-			std::cout << std::endl; */
 
 			IloExpr cut(env);
 			int arestas_na_solucao = 0;
@@ -409,7 +382,6 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraintsILP, IloBoolVarArray, x) {
 
 			double rhs = double(component.size() - 1.0);
 			if(arestas_na_solucao > rhs){
-//				cout << cut << " <= " << rhs << endl;
 				add(cut <= rhs);
 				contador_sec++;
 			}
@@ -425,7 +397,6 @@ ILOHEURISTICCALLBACK2(HeuristicaPrimalILP, IloBoolVarArray, y, IloBoolVarArray, 
 	getValues(val_x, x);
 	getValues(val_y, y);
 
-//  cout << "testOk() pre heuristica: " << testOk(val_x, val_y, val_z) << endl;
   /* r e p sao vetores uteis para o algoritmo union-find */
 	vector<int> r(v_);
 	vector<int> p(v_);

@@ -70,8 +70,6 @@ extern IloBoolVarArray* x_global;
     - Verifica se essa soma de pesos eh menor que um
     - Caso seja, o corte eh adicionado*/
 ILOUSERCUTCALLBACK3(CortesHybrid, IloBoolVarArray, x, IloBoolVarArray, y, IloBoolVarArray, z) {
-  //cout << "Entrei no callback CortesHybrid" << endl;
-
    /* Recupera ambiente do cplex */
   IloEnv env = getEnv();
 
@@ -206,11 +204,9 @@ ILOUSERCUTCALLBACK3(CortesHybrid, IloBoolVarArray, x, IloBoolVarArray, y, IloBoo
       break;
     }
   }
-  //cout << "sai do callback CortesHybrid" << endl;
 }
 
 ILOLAZYCONSTRAINTCALLBACK1(LazyConstraintsHybrid, IloBoolVarArray, x) {
-  //cout << "Entrou no LazyConstraintsHybrid" << endl;
   /* Recupera ambiente do cplex */
   IloEnv env = getEnv();
 
@@ -253,7 +249,6 @@ ILOLAZYCONSTRAINTCALLBACK1(LazyConstraintsHybrid, IloBoolVarArray, x) {
 }
 
 ILOHEURISTICCALLBACK3(HeuristicaPrimalHybrid, IloBoolVarArray, x, IloBoolVarArray, y, IloBoolVarArray,  z) {
-  //cout << "Entrou no HeuristicaPrimalHybrid" << endl;
   IloNumArray val_x(getEnv());
   IloNumArray val_y(getEnv());
   IloNumArray val_z(getEnv());
@@ -261,8 +256,7 @@ ILOHEURISTICCALLBACK3(HeuristicaPrimalHybrid, IloBoolVarArray, x, IloBoolVarArra
   getValues(val_y, y);
   getValues(val_z, z);
 
-  //cout << "testOk() pre heuristica: " << testOk(val_x, val_y, val_z) << endl;
-  /* r e p sao vetores uteis para o algoritmo union-find */
+  /* 'r' e 'p' sao vetores uteis para o algoritmo union-find */
   vector<int> r(v_);
   vector<int> p(v_);
   vector<int> deg(v_, 0); /* grau dos vertices da solucao heuristica */
@@ -333,7 +327,6 @@ ILOHEURISTICCALLBACK3(HeuristicaPrimalHybrid, IloBoolVarArray, x, IloBoolVarArra
   for (int i = 0; i < 2 * a_; i++)  vals.add(val_z[i]);
 
   setSolution(vars, vals, custo);
-  //cout << "testOk() pos heuristica: " << testOk(val_x, val_y, val_z) << endl;
 }
 
 #endif  // HYBRID_H_
